@@ -8,9 +8,9 @@ export const api = axios.create({
 // إضافة Interceptor عشان يبعت التوكن تلقائياً مع كل طلب
 api.interceptors.request.use(
   (config) => {
-    // التأكد إننا في بيئة المتصفح مش السيرفر
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token'); // تأكد إن اسم التوكن هنا مطابق للي بتحفظه وقت الـ Login
+      // تم تعديل الكلمة هنا لـ urlap_token
+      const token = localStorage.getItem('urlap_token'); 
       
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
