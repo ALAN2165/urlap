@@ -11,7 +11,28 @@ import { errorHandler } from './middleware/errorHandler';
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3000' }));
+
+// الدومينات المسموح لها بالتواصل مع الباك إند
+const allowedOrigins = [
+  'https://urlap.com',
+  'https://www.urlap.com',
+  process.env.FRONTEND_URL,
+  'http://localhost:3000',
+  'http://localhost:3001'
+].filter(Boolean); // لتصفية أي قيم undefined
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
 app.use(morgan('dev'));
 app.use(express.json());
 
