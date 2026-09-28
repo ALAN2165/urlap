@@ -1,7 +1,6 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
-  "/page": "app/page.js",
   "/(main)/dashboard/page": "app/(main)/dashboard/page.js",
+  "/page": "app/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(main)/challenges/[labSlug]/page": "app/(main)/challenges/[labSlug]/page.js",
   "/(main)/challenges/[labSlug]/[challengeSlug]/page": "app/(main)/challenges/[labSlug]/[challengeSlug]/page.js"
