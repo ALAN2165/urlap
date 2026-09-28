@@ -40,9 +40,9 @@ export default function Navbar() {
       className="fixed top-0 w-full z-50 h-24 flex items-center glass"
     >
       <div className="max-w-7xl mx-auto px-8 w-full flex items-center justify-between">
-        <Link href="/">
-          <LogoOrb size={64} imgSize={38} float={false} />
-        </Link>
+       <Link href="/">
+  <LogoOrb size={64} imgSize={38} />
+</Link>
 
         <div className="hidden md:flex items-center gap-2">
           <NavLink href="/challenges" label={t('challenges')} />
