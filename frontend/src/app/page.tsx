@@ -36,7 +36,7 @@ function Floater({ pos, delay, duration, children }: { pos: string; delay: numbe
 const stagger = { animate: { transition: { staggerChildren: 0.12, delayChildren: 0.5 } } };
 const fadeUp = {
   initial: { opacity: 0, y: 40 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.7, ease: 'easeOut' } },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.7, ease: 'easeOut' as const } },
 };
 
 export default function HomePage() {
