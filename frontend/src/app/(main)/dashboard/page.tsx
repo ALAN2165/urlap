@@ -11,11 +11,11 @@ import { Lab, Stats } from '@/types';
 import ProgressRing from '@/components/dashboard/ProgressRing';
 import CountUp from '@/components/dashboard/CountUp';
 
-const stagger = { animate: { transition: { staggerChildren: 0.1 } } };
+const stagger = { animate: { transition: { staggerChildren: 0.1 } } } as const;
 const fadeUp = {
   initial: { opacity: 0, y: 32 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
-};
+} as const;
 
 export default function DashboardPage() {
   const t = useTranslations('dashboard');
@@ -153,7 +153,6 @@ export default function DashboardPage() {
           );
         })}
       </motion.div>
-      {/* keeps the challenge namespace referenced for future difficulty badges */}
     </div>
   );
 }
