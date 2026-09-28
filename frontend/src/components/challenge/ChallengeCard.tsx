@@ -1,11 +1,24 @@
-// frontend/src/components/challenge/ChallengeCard.tsx
 'use client';
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useLocale } from 'next-intl';
-import { Challenge } from '@/types';
 import { CheckCircle2, Trophy } from 'lucide-react';
+
+// تعريف نوع الـ Challenge محلياً لضمان عدم حدوث أي أخطاء في الـ Build
+interface Challenge {
+  id: string | number;
+  slug: string;
+  titleAr: string;
+  titleEn: string;
+  difficulty: 'EASY' | 'MEDIUM' | 'HARD' | 'EXPERT';
+  solved?: boolean;
+  points: number;
+  category: {
+    nameAr: string;
+    nameEn: string;
+  };
+}
 
 const DIFFICULTY_STYLES: Record<string, string> = {
   EASY: 'bg-teal-500/10 text-teal-400 border border-teal-500/20',
