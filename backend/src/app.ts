@@ -21,17 +21,28 @@ const allowedOrigins = [
   'http://localhost:3001'
 ].filter(Boolean); // لتصفية أي قيم undefined
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
-      callback(null, true);
-    } else {
+// backend/src/app.ts
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // السماح بالطلبات اللي ملهاش origin زي Postman أو الـ Mobile Apps
+      if (!origin) return callback(null, true);
+      
+      // السماح لأي رابط Vercel أو Localhost أو الدومين الأساسي بتاعك
+      if (
+        origin.endsWith('.vercel.app') ||
+        origin === 'https://urlap.com' ||
+        origin === 'https://www.urlap.com' ||
+        origin.startsWith('http://localhost:')
+      ) {
+        return callback(null, true);
+      }
+      
       callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
-}));
+    },
+    credentials: true,
+  })
+);
 
 app.use(morgan('dev'));
 app.use(express.json());
