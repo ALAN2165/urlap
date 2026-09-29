@@ -2,6 +2,9 @@
   "nav": {
     "challenges": "Challenges",
     "dashboard": "Dashboard",
+    "leaderboard": "Leaderboard",
+    "announcements": "Announcements",
+    "profile": "Profile",
     "login": "Login",
     "register": "Register",
     "logout": "Logout"
@@ -56,16 +59,18 @@
     "reasonColumns": "The column names don't match what the challenge asks for. Check your SELECT list and any aliases.",
     "reasonRowCount": "Your query returned {actual} rows, but the expected result has {expected}.",
     "reasonRows": "The row count matches, but the data or the ordering is different. Check your conditions and ORDER BY.",
+    "reasonNotRowReturning": "Your statement ran successfully, but it didn't return any rows to compare — this challenge expects a query like SELECT that returns data.",
     "noRows": "The query ran successfully but returned 0 rows.",
     "rows": "Rows",
     "showingFirst": "Showing the first {shown}",
     "nextChallenge": "Next challenge"
   },
   "home": {
-  "titleLine1": "Write. Execute.",
-  "titleLine2": "Level up.",
-  "subtitle": "Drop the theory. Welcome to the ultimate SQL battleground. Execute live queries against a real PostgreSQL engine, crush complex datasets, and forge your path to database mastery.",
-  "ctaStart": "Start solving",
+    "badge": "Now in early access",
+    "titleLine1": "Query. Solve.",
+    "titleLine2": "Level up.",
+    "subtitle": "Real SQL challenges executed on a real PostgreSQL database, with instant row-by-row feedback and progressive hints, inside a secure sandbox.",
+    "ctaStart": "Start solving free",
     "ctaContinue": "Continue learning",
     "feature1Title": "Real execution",
     "feature1Desc": "Your queries run on a live, locked-down PostgreSQL database",
@@ -89,5 +94,39 @@
     "start": "Start",
     "comingSoon": "Coming soon",
     "solvedOf": "{solved} of {total} solved"
+  },
+  "profile": {
+    "title": "Profile",
+    "subtitle": "Manage your account settings.",
+    "displayName": "Display Name",
+    "newPassword": "New Password",
+    "newPasswordPlaceholder": "Leave blank to keep your current password",
+    "saveChanges": "Save changes",
+    "saved": "Profile updated.",
+    "leaderboardToggleTitle": "Show my profile in the Leaderboard",
+    "leaderboardToggleDesc": "When off, your rank still counts, but you won't appear in the public list.",
+    "usernameTaken": "That username is already taken.",
+    "nothingToUpdate": "Nothing to update.",
+    "updateFailed": "Could not update your profile."
+  },
+  "leaderboard": {
+    "title": "Leaderboard",
+    "subtitle": "Top players ranked by total points.",
+    "rank": "Rank",
+    "player": "Player",
+    "points": "pts",
+    "empty": "No one on the leaderboard yet — be the first to solve a challenge!",
+    "hiddenNotice": "You're currently hidden from the public leaderboard.",
+    "hiddenAction": "Change this in your profile",
+    "you": "You"
+  },
+  "announcements": {
+    "title": "Announcements",
+    "subtitle": "What's new on urlap.",
+    "empty": "No announcements yet.",
+    "badgeInfo": "Info",
+    "badgeNewLab": "New Lab",
+    "badgeFeature": "New Feature",
+    "badgeMaintenance": "Maintenance"
   }
 }

@@ -1,4 +1,3 @@
-// frontend/src/store/authStore.ts
 import { create } from 'zustand';
 
 interface User {
@@ -7,6 +6,7 @@ interface User {
   email: string;
   totalPoints: number;
   avatarUrl?: string | null;
+  showInLeaderboard?: boolean;
 }
 
 interface AuthState {

@@ -18,10 +18,10 @@ export default function ThemeToggle() {
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
       aria-label="Toggle theme"
       dir="ltr"
-      className="relative w-20 h-11 rounded-full bg-slate-200/70 dark:bg-white/[0.06] border border-slate-300 dark:border-white/[0.1] backdrop-blur-xl"
+      className="relative w-20 h-11 rounded-full bg-slate-200/70 dark:bg-slate-800/60 border border-slate-300 dark:border-slate-700/60 backdrop-blur-xl"
     >
       <motion.div
-        className="absolute top-1 left-1 w-9 h-9 rounded-full bg-gradient-to-br from-teal-400 to-purple-500 shadow-[0_0_18px_rgba(45,212,191,0.5)] flex items-center justify-center"
+        className="absolute top-1 left-1 w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 shadow-[0_0_16px_rgba(168,85,247,0.45)] flex items-center justify-center"
         animate={{ x: isDark ? 36 : 0 }}
         transition={{ type: 'spring', stiffness: 380, damping: 26 }}
       >
