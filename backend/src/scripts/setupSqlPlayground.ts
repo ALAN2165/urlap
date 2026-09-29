@@ -35,7 +35,7 @@ async function main() {
     );
   `);
 
-  // The grader role can never touch the app's own tables (users, submissions, ...).
+  // The grader role can never touch the app's own tables.
   await admin.query(`REVOKE ALL ON SCHEMA public FROM urlap_grader;`);
   await admin.query(`REVOKE ALL ON ALL TABLES IN SCHEMA public FROM urlap_grader;`);
   await admin.query(`GRANT USAGE ON SCHEMA playground TO urlap_grader;`);
@@ -43,6 +43,12 @@ async function main() {
   await admin.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA playground GRANT SELECT ON TABLES TO urlap_grader;`);
   await admin.query(`ALTER ROLE urlap_grader SET search_path = playground;`);
   await admin.query(`ALTER ROLE urlap_grader SET statement_timeout = '3000';`);
+
+  // Extra hardening now that the grader accepts arbitrary statement types
+  // (DO blocks, CREATE FUNCTION, etc.), not just SELECT:
+  await admin.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC;`);
+  await admin.query(`REVOKE CREATE ON SCHEMA playground FROM PUBLIC;`);
+  await admin.query(`REVOKE TEMP ON DATABASE ${new URL(process.env.DATABASE_URL || '').pathname.replace('/', '')} FROM urlap_grader;`);
 
   console.log('🌱 Inserting dummy employee rows...');
 

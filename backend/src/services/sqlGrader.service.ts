@@ -1,16 +1,18 @@
-import type { PoolClient } from 'pg';
+import type { PoolClient, QueryResult } from 'pg';
 import { graderPool } from '../config/sqlGraderPool';
 
-const FETCH_LIMIT = 1000;   // hard cap on rows pulled into memory per query
-const DISPLAY_LIMIT = 100;  // rows sent back to the browser
-
-// The role permissions and the READ ONLY transaction are the real safety net;
-// this list only produces a friendlier error message earlier.
-const BLOCKED_KEYWORDS =
-  /\b(insert|update|delete|drop|alter|truncate|grant|revoke|create|copy|vacuum|call|do|set_config|listen|notify|lock)\b/i;
+const FETCH_LIMIT = 1000;
+const DISPLAY_LIMIT = 100;
 
 const COMMENTS_OR_LITERALS = /('(?:[^']|'')*'|"(?:[^"]|"")*")|--[^\n]*|\/\*[\s\S]*?\*\//g;
 const LITERALS = /'(?:[^']|'')*'|"(?:[^"]|"")*"/g;
+
+// Statements that produce a result set we can DECLARE a cursor over. Everything
+// else (DO blocks, CREATE FUNCTION, UPDATE, INSERT, DELETE, ALTER, ...) is now
+// accepted and executed directly — Postgres itself decides what's actually
+// allowed, via the READ ONLY transaction below and the locked-down
+// urlap_grader role's privileges. There is no keyword blocklist anymore.
+const ROW_RETURNING_LEADING_WORD = new Set(['select', 'with']);
 
 export interface GradeResult {
   passed: boolean;
@@ -22,7 +24,7 @@ export interface GradeResult {
   resultRows: unknown[][];
   totalRows: number;
   expectedRowCount: number | null;
-  failureReason: 'COLUMNS' | 'ROW_COUNT' | 'ROWS' | null;
+  failureReason: 'COLUMNS' | 'ROW_COUNT' | 'ROWS' | 'NOT_ROW_RETURNING' | null;
 }
 
 interface QueryOutput {
@@ -45,7 +47,6 @@ function emptyResult(start: number, status: GradeResult['status'], errorMessage:
   };
 }
 
-// Removes -- and /* */ comments (keeping string literals intact) plus a trailing semicolon.
 function prepare(sql: string): string {
   return sql
     .replace(COMMENTS_OR_LITERALS, (_match, literal) => (literal !== undefined ? literal : ' '))
@@ -54,17 +55,19 @@ function prepare(sql: string): string {
     .trim();
 }
 
-function assertReadOnlySelect(prepared: string): void {
+function assertSingleStatement(prepared: string): void {
   if (!prepared) throw new Error('Write a query first.');
   const masked = prepared.replace(LITERALS, "''");
-  if (masked.includes(';')) throw new Error('Only a single SQL statement is allowed.');
-  const firstWord = masked.trim().split(/\s+/)[0]?.toLowerCase();
-  if (firstWord !== 'select' && firstWord !== 'with') {
-    throw new Error('Only SELECT queries (or WITH … SELECT) are allowed.');
+  if (masked.includes(';')) {
+    throw new Error('Only a single SQL statement is allowed — remove any extra semicolons.');
   }
-  if (BLOCKED_KEYWORDS.test(masked)) {
-    throw new Error('This query uses a keyword that is not allowed. Only read-only SELECT queries can be run.');
-  }
+}
+
+function leadingWord(sql: string): string {
+  return sql.trim().split(/\s+/)[0]?.toLowerCase() ?? '';
+}
+function isRowReturning(sql: string): boolean {
+  return ROW_RETURNING_LEADING_WORD.has(leadingWord(sql));
 }
 
 function normalizeValue(value: unknown): unknown {
@@ -75,13 +78,21 @@ function normalizeValue(value: unknown): unknown {
 }
 const rowKey = (row: unknown[]) => JSON.stringify(row.map(normalizeValue));
 
-// A cursor lets us pull at most FETCH_LIMIT rows, so a runaway query
-// (e.g. generate_series) can never flood the server's memory.
 async function runCursor(client: PoolClient, sql: string): Promise<QueryOutput> {
   await client.query(`DECLARE grader_cur NO SCROLL CURSOR FOR\n${sql}\n`);
   const res = await client.query({ text: `FETCH ${FETCH_LIMIT} FROM grader_cur`, rowMode: 'array' });
   await client.query('CLOSE grader_cur');
   return { columns: res.fields.map((f) => f.name), rows: res.rows as unknown[][] };
+}
+
+// For anything that isn't SELECT/WITH: run it directly and report what Postgres
+// actually did. There's no row-by-row comparison for these yet — grading real
+// DML/DDL challenges needs a separate mechanism (a writable per-attempt schema
+// inspected before rollback), which doesn't exist yet since Labs 2+ have no
+// content. For now, current Lab 1 challenges (all SELECT-based) will correctly
+// mark a non-row-returning submission as wrong, with a clear reason why.
+async function runDirect(client: PoolClient, sql: string): Promise<QueryResult> {
+  return client.query(sql);
 }
 
 export async function runSqlGraded(referenceSql: string, submittedSql: string): Promise<GradeResult> {
@@ -90,7 +101,7 @@ export async function runSqlGraded(referenceSql: string, submittedSql: string): 
   let submitted: string;
   try {
     submitted = prepare(submittedSql);
-    assertReadOnlySelect(submitted);
+    assertSingleStatement(submitted);
   } catch (validationErr: any) {
     return emptyResult(start, 'RUNTIME_ERROR', validationErr.message);
   }
@@ -106,9 +117,18 @@ export async function runSqlGraded(referenceSql: string, submittedSql: string): 
     await client.query('BEGIN READ ONLY');
     await client.query("SET LOCAL statement_timeout = '3000ms'");
 
-    let sub: QueryOutput;
+    const submittedReturnsRows = isRowReturning(submitted);
+    const referenceReturnsRows = isRowReturning(reference);
+
+    let sub: QueryOutput | null = null;
+    let directResult: QueryResult | null = null;
+
     try {
-      sub = await runCursor(client, submitted);
+      if (submittedReturnsRows) {
+        sub = await runCursor(client, submitted);
+      } else {
+        directResult = await runDirect(client, submitted);
+      }
     } catch (dbErr: any) {
       await client.query('ROLLBACK').catch(() => undefined);
       return dbErr.code === '57014'
@@ -116,9 +136,40 @@ export async function runSqlGraded(referenceSql: string, submittedSql: string): 
         : emptyResult(start, 'RUNTIME_ERROR', dbErr.message);
     }
 
+    if (!submittedReturnsRows) {
+      await client.query('ROLLBACK');
+      const tag = directResult?.command ?? 'STATEMENT';
+      if (!referenceReturnsRows) {
+        return {
+          passed: true,
+          status: 'ACCEPTED',
+          output: `${tag} executed successfully (${directResult?.rowCount ?? 0} row(s) affected).`,
+          errorMessage: '',
+          runtimeMs: Date.now() - start,
+          resultColumns: [],
+          resultRows: [],
+          totalRows: directResult?.rowCount ?? 0,
+          expectedRowCount: null,
+          failureReason: null,
+        };
+      }
+      return {
+        passed: false,
+        status: 'WRONG_ANSWER',
+        output: `${tag} executed, but this challenge expects a query that returns rows (like a SELECT).`,
+        errorMessage: '',
+        runtimeMs: Date.now() - start,
+        resultColumns: [],
+        resultRows: [],
+        totalRows: 0,
+        expectedRowCount: null,
+        failureReason: 'NOT_ROW_RETURNING',
+      };
+    }
+
     let ref: QueryOutput;
     try {
-      ref = await runCursor(client, reference);
+      ref = referenceReturnsRows ? await runCursor(client, reference) : { columns: [], rows: [] };
     } catch (refErr) {
       await client.query('ROLLBACK').catch(() => undefined);
       console.error('Reference SQL failed to run:', refErr);
@@ -127,8 +178,9 @@ export async function runSqlGraded(referenceSql: string, submittedSql: string): 
 
     await client.query('ROLLBACK');
 
-    const sameColumns = JSON.stringify(sub.columns) === JSON.stringify(ref.columns);
-    const subKeys = sub.rows.map(rowKey);
+    const submittedRows = sub!;
+    const sameColumns = JSON.stringify(submittedRows.columns) === JSON.stringify(ref.columns);
+    const subKeys = submittedRows.rows.map(rowKey);
     const refKeys = ref.rows.map(rowKey);
     const orderMatters = /\border\s+by\b/i.test(reference);
     const sameRows = orderMatters
@@ -137,19 +189,19 @@ export async function runSqlGraded(referenceSql: string, submittedSql: string): 
 
     let failureReason: GradeResult['failureReason'] = null;
     if (!sameColumns) failureReason = 'COLUMNS';
-    else if (sub.rows.length !== ref.rows.length) failureReason = 'ROW_COUNT';
+    else if (submittedRows.rows.length !== ref.rows.length) failureReason = 'ROW_COUNT';
     else if (!sameRows) failureReason = 'ROWS';
 
     const passed = failureReason === null;
     return {
       passed,
       status: passed ? 'ACCEPTED' : 'WRONG_ANSWER',
-      output: passed ? `Correct: ${sub.rows.length} row(s) match the expected result.` : `Wrong answer (${failureReason}).`,
+      output: passed ? `Correct: ${submittedRows.rows.length} row(s) match the expected result.` : `Wrong answer (${failureReason}).`,
       errorMessage: '',
       runtimeMs: Date.now() - start,
-      resultColumns: sub.columns,
-      resultRows: sub.rows.slice(0, DISPLAY_LIMIT),
-      totalRows: sub.rows.length,
+      resultColumns: submittedRows.columns,
+      resultRows: submittedRows.rows.slice(0, DISPLAY_LIMIT),
+      totalRows: submittedRows.rows.length,
       expectedRowCount: ref.rows.length,
       failureReason,
     };

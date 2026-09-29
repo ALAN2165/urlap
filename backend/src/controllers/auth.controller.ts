@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
+import bcrypt from 'bcryptjs';
 import { registerSchema, loginSchema } from '../validators/auth.validator';
+import { updateProfileSchema } from '../validators/profile.validator';
 import { registerUser, loginUser } from '../services/auth.service';
 import { prisma } from '../config/db';
 import { AuthRequest } from '../middleware/authMiddleware';
@@ -24,7 +26,10 @@ export async function me(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const user = await prisma.user.findUniqueOrThrow({
       where: { id: req.userId },
-      select: { id: true, username: true, email: true, avatarUrl: true, totalPoints: true, preferredLang: true, createdAt: true },
+      select: {
+        id: true, username: true, email: true, avatarUrl: true,
+        totalPoints: true, preferredLang: true, showInLeaderboard: true, createdAt: true,
+      },
     });
     res.json(user);
   } catch (err) { next(err); }
@@ -39,12 +44,41 @@ export async function stats(req: AuthRequest, res: Response, next: NextFunction)
       prisma.challengeCompletion.count({ where: { userId: req.userId } }),
       prisma.challenge.count(),
     ]);
-    res.json({
-      totalPoints: mine.totalPoints,
-      rank: higherRanked + 1, // ties share a rank
-      totalUsers,
-      solvedChallenges,
-      totalChallenges,
+    res.json({ totalPoints: mine.totalPoints, rank: higherRanked + 1, totalUsers, solvedChallenges, totalChallenges });
+  } catch (err) { next(err); }
+}
+
+export async function updateProfile(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const { username, password, showInLeaderboard } = updateProfileSchema.parse(req.body);
+
+    const data: { username?: string; passwordHash?: string; showInLeaderboard?: boolean } = {};
+
+    if (username !== undefined) {
+      const existing = await prisma.user.findFirst({ where: { username, NOT: { id: req.userId } } });
+      if (existing) return res.status(409).json({ error: 'That username is already taken.' });
+      data.username = username;
+    }
+    if (password !== undefined) {
+      data.passwordHash = await bcrypt.hash(password, 12);
+    }
+    if (showInLeaderboard !== undefined) {
+      data.showInLeaderboard = showInLeaderboard;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'Nothing to update.' });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.userId },
+      data,
+      select: {
+        id: true, username: true, email: true, avatarUrl: true,
+        totalPoints: true, preferredLang: true, showInLeaderboard: true, createdAt: true,
+      },
     });
+
+    res.json(updated);
   } catch (err) { next(err); }
 }

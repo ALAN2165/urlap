@@ -36,16 +36,24 @@ enum SubmissionStatus {
   MEMORY_LIMIT_EXCEEDED
 }
 
+enum AnnouncementType {
+  INFO
+  NEW_LAB
+  FEATURE
+  MAINTENANCE
+}
+
 model User {
-  id            String   @id @default(cuid())
-  username      String   @unique
-  email         String   @unique
-  passwordHash  String
-  avatarUrl     String?
-  totalPoints   Int      @default(0)
-  preferredLang String   @default("en")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                String   @id @default(cuid())
+  username          String   @unique
+  email             String   @unique
+  passwordHash      String
+  avatarUrl         String?
+  totalPoints       Int      @default(0)
+  preferredLang     String   @default("en")
+  showInLeaderboard Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   submissions      Submission[]
   solvedChallenges ChallengeCompletion[]
@@ -90,16 +98,13 @@ model Challenge {
   memoryLimitMb   Int        @default(128)
   orderIndex      Int        @default(0)
 
-  // JSON string describing tables for the SchemaViewer UI
   schemaJson      String?    @db.Text
-
-  // Interim grading approach for SQL — see note at the end of the response
   referenceAnswer String?    @db.Text
 
-  labId       String?
-  lab         Lab?       @relation(fields: [labId], references: [id])
-  categoryId  String?
-  category    Category?  @relation(fields: [categoryId], references: [id])
+  labId      String?
+  lab        Lab?      @relation(fields: [labId], references: [id])
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
 
   starterCodes StarterCode[]
   testCases    TestCase[]
@@ -194,4 +199,16 @@ model ChallengeCompletion {
 
   @@unique([userId, challengeId])
   @@map("challenge_completions")
+}
+
+model Announcement {
+  id        String           @id @default(cuid())
+  titleEn   String
+  titleAr   String
+  contentEn String           @db.Text
+  contentAr String           @db.Text
+  type      AnnouncementType @default(INFO)
+  createdAt DateTime         @default(now())
+
+  @@map("announcements")
 }

@@ -18,12 +18,7 @@ async function main() {
   const labs = [];
   for (let i = 0; i < LAB_TITLES.length; i++) {
     const lab = await prisma.lab.create({
-      data: {
-        slug: `lab-${i + 1}`,
-        titleEn: LAB_TITLES[i].en,
-        titleAr: LAB_TITLES[i].ar,
-        orderIndex: i,
-      },
+      data: { slug: `lab-${i + 1}`, titleEn: LAB_TITLES[i].en, titleAr: LAB_TITLES[i].ar, orderIndex: i },
     });
     labs.push(lab);
   }
@@ -40,9 +35,7 @@ async function main() {
       difficulty: Difficulty.EASY,
       points: 100,
       schema: { tables: [{ name: 'employees', columns: [
-        { name: 'last_name', type: 'varchar' },
-        { name: 'job_id', type: 'varchar' },
-        { name: 'salary', type: 'int' },
+        { name: 'last_name', type: 'varchar' }, { name: 'job_id', type: 'varchar' }, { name: 'salary', type: 'int' },
       ]}]},
       answer: `SELECT last_name, job_id, salary FROM employees WHERE salary = 17000;`,
       hints: [
@@ -65,8 +58,7 @@ async function main() {
       difficulty: Difficulty.EASY,
       points: 100,
       schema: { tables: [{ name: 'employees', columns: [
-        { name: 'last_name', type: 'varchar' },
-        { name: 'salary', type: 'int' },
+        { name: 'last_name', type: 'varchar' }, { name: 'salary', type: 'int' },
       ]}]},
       answer: `SELECT last_name, salary + 500 AS "Adjusted Salary" FROM employees;`,
       hints: [
@@ -89,9 +81,7 @@ async function main() {
       difficulty: Difficulty.MEDIUM,
       points: 150,
       schema: { tables: [{ name: 'employees', columns: [
-        { name: 'last_name', type: 'varchar' },
-        { name: 'hire_date', type: 'date' },
-        { name: 'job_id', type: 'varchar' },
+        { name: 'last_name', type: 'varchar' }, { name: 'hire_date', type: 'date' }, { name: 'job_id', type: 'varchar' },
       ]}]},
       answer: `SELECT last_name, hire_date FROM employees WHERE job_id IN ('SA_REP', 'ST_CLERK') AND last_name LIKE '%a%' ORDER BY hire_date DESC;`,
       hints: [
@@ -114,14 +104,12 @@ async function main() {
       difficulty: Difficulty.MEDIUM,
       points: 150,
       schema: { tables: [{ name: 'employees', columns: [
-        { name: 'employee_id', type: 'int', key: 'PK' },
-        { name: 'last_name', type: 'varchar' },
-        { name: 'commission_pct', type: 'float' },
-        { name: 'manager_id', type: 'int', key: 'FK' },
+        { name: 'employee_id', type: 'int', key: 'PK' }, { name: 'last_name', type: 'varchar' },
+        { name: 'commission_pct', type: 'float' }, { name: 'manager_id', type: 'int', key: 'FK' },
       ]}]},
       answer: `SELECT employee_id, last_name, commission_pct FROM employees WHERE manager_id IS NULL OR commission_pct = .2;`,
       hints: [
-        'To check if an employee doesn\'t have a manager, you cannot use = NULL.',
+        "To check if an employee doesn't have a manager, you cannot use = NULL.",
         'Use the IS NULL operator to check for unavailable or unassigned values.',
         'Connect your two conditions using the logical OR operator.',
       ],
@@ -140,9 +128,7 @@ async function main() {
       difficulty: Difficulty.HARD,
       points: 200,
       schema: { tables: [{ name: 'employees', columns: [
-        { name: 'department_id', type: 'int', key: 'FK' },
-        { name: 'salary', type: 'int' },
-        { name: 'job_id', type: 'varchar' },
+        { name: 'department_id', type: 'int', key: 'FK' }, { name: 'salary', type: 'int' }, { name: 'job_id', type: 'varchar' },
       ]}]},
       answer: `SELECT DISTINCT department_id FROM employees WHERE salary BETWEEN 5000 AND 10000 AND job_id NOT IN ('IT_PROG');`,
       hints: [
@@ -162,35 +148,39 @@ async function main() {
     const c = challenges[i];
     await prisma.challenge.create({
       data: {
-        slug: c.slug,
-        titleEn: c.titleEn,
-        titleAr: c.titleAr,
-        descriptionEn: c.descriptionEn,
-        descriptionAr: c.descriptionAr,
-        difficulty: c.difficulty,
-        points: c.points,
-        orderIndex: i,
-        labId: lab1.id,
-        schemaJson: JSON.stringify(c.schema),
-        referenceAnswer: c.answer,
-        starterCodes: {
-          create: [{ language: Language.SQL, code: '-- write your SQL query here\n' }],
-        },
-        hints: {
-          create: c.hints.map((h, idx) => ({
-            order: idx + 1,
-            contentEn: h,
-            contentAr: c.hintsAr[idx],
-            pointPenalty: (idx + 1) * 10,
-          })),
-        },
+        slug: c.slug, titleEn: c.titleEn, titleAr: c.titleAr,
+        descriptionEn: c.descriptionEn, descriptionAr: c.descriptionAr,
+        difficulty: c.difficulty, points: c.points, orderIndex: i, labId: lab1.id,
+        schemaJson: JSON.stringify(c.schema), referenceAnswer: c.answer,
+        starterCodes: { create: [{ language: Language.SQL, code: '-- write your SQL query here\n' }] },
+        hints: { create: c.hints.map((h, idx) => ({
+          order: idx + 1, contentEn: h, contentAr: c.hintsAr[idx], pointPenalty: (idx + 1) * 10,
+        })) },
       },
     });
   }
 
-  console.log(`✅ Seeded ${labs.length} labs — Lab 1 has ${challenges.length} challenges, Labs 2–7 are empty.`);
+  console.log('📢 Seeding announcements...');
+  await prisma.announcement.createMany({
+    data: [
+      {
+        titleEn: 'Welcome to urlap!',
+        titleAr: 'مرحبًا بك في urlap!',
+        contentEn: 'Lab 1 is live with 5 real SQL challenges, graded by actually executing your query against a live database. Good luck!',
+        contentAr: 'المعمل الأول متاح الآن ويحتوي على 5 تحديات SQL حقيقية، ويتم تصحيحها عبر تنفيذ استعلامك فعليًا على قاعدة بيانات حية. بالتوفيق!',
+        type: 'FEATURE',
+      },
+      {
+        titleEn: 'Labs 2–7 are coming soon',
+        titleAr: 'المعامل من 2 إلى 7 قادمة قريبًا',
+        contentEn: 'We are preparing new challenges covering joins, aggregation, subqueries, window functions, and more. Stay tuned!',
+        contentAr: 'نجهّز تحديات جديدة تغطي الربط بين الجداول، والتجميع، والاستعلامات الفرعية، ودوال النافذة، والمزيد. ترقبوا ذلك!',
+        type: 'NEW_LAB',
+      },
+    ],
+  });
+
+  console.log(`✅ Seeded ${labs.length} labs, ${challenges.length} challenges in Lab 1, and 2 announcements.`);
 }
 
-main()
-  .catch((e) => { console.error(e); process.exit(1); })
-  .finally(async () => { await prisma.$disconnect(); });
+main().catch((e) => { console.error(e); process.exit(1); }).finally(async () => { await prisma.$disconnect(); });
