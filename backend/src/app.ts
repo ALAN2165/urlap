@@ -18,7 +18,6 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    // السماح للطلبات التي ليس لها origin (مثل Postman أو السيرفر المباشر) أو الـ Vercel والمحلي
     if (
       !origin ||
       allowedOrigins.includes(origin) ||
@@ -28,7 +27,7 @@ const corsOptions: cors.CorsOptions = {
     ) {
       callback(null, true);
     } else {
-      callback(null, false); // تم التعديل لمنع رمي خطأ كراش وإرجاع رفض نظيف للـ CORS فقط
+      callback(null, false);
     }
   },
   credentials: true,
@@ -38,9 +37,6 @@ const corsOptions: cors.CorsOptions = {
 
 app.use(helmet());
 app.use(cors(corsOptions));
-// دعم الـ preflight requests لكل المسارات تلقائياً
-app.options('*', cors(corsOptions));
-
 app.use(morgan('dev'));
 app.use(express.json());
 
