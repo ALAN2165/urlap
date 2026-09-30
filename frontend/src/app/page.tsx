@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, Braces, Code2, Database, Layers, Server, Sparkles, Terminal, Trophy, Zap } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,8 +34,8 @@ function Floater({ pos, delay, duration, children }: { pos: string; delay: numbe
   );
 }
 
-const stagger = { animate: { transition: { staggerChildren: 0.12, delayChildren: 0.5 } } };
-const fadeUp = { initial: { opacity: 0, y: 40 }, animate: { opacity: 1, y: 0, transition: { duration: 0.7, ease: 'easeOut' } } };
+const stagger: Variants = { animate: { transition: { staggerChildren: 0.12, delayChildren: 0.5 } } };
+const fadeUp: Variants = { initial: { opacity: 0, y: 40 }, animate: { opacity: 1, y: 0, transition: { duration: 0.7, ease: 'easeOut' } } };
 
 export default function HomePage() {
   const t = useTranslations('home');
@@ -112,7 +112,6 @@ export default function HomePage() {
           {t('subtitle')}
         </motion.p>
 
-        {/* Normal-sized buttons: capped padding/text at md+, auto-width instead of stretching */}
         <motion.div variants={fadeUp} className="mb-12 flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4 md:mb-16">
           <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto">
             <Link
