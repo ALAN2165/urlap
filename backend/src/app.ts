@@ -18,23 +18,29 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    // السماح للـ Localhost و أي رابط يتبع لـ Vercel تلقائياً (سواء Production أو Preview)
+    // السماح للطلبات التي ليس لها origin (مثل Postman أو السيرفر المباشر) أو الـ Vercel والمحلي
     if (
       !origin ||
       allowedOrigins.includes(origin) ||
       origin.endsWith('.vercel.app') ||
-      origin.includes('localhost')
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1')
     ) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, false); // تم التعديل لمنع رمي خطأ كراش وإرجاع رفض نظيف للـ CORS فقط
     }
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 };
 
 app.use(helmet());
 app.use(cors(corsOptions));
+// دعم الـ preflight requests لكل المسارات تلقائياً
+app.options('*', cors(corsOptions));
+
 app.use(morgan('dev'));
 app.use(express.json());
 
