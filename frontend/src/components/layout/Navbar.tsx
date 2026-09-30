@@ -5,14 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
-import { Trophy, Megaphone, Menu, X, LayoutGrid } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import LanguageToggle from './LanguageToggle';
 import LogoOrb from '@/components/shared/LogoOrb';
-import AvatarCircle from '@/components/shared/AvatarCircle';
 import { useAuth } from '@/hooks/useAuth';
 
-function NavLink({ href, label, icon }: { href: string; label: string; icon?: React.ReactNode }) {
+function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
   const active = pathname === href;
   const [hovered, setHovered] = useState(false);
@@ -22,26 +21,24 @@ function NavLink({ href, label, icon }: { href: string; label: string; icon?: Re
       {(active || hovered) && (
         <motion.div layoutId="nav-pill" className="absolute inset-0 rounded-full bg-purple-500/10 border border-purple-400/20" transition={{ type: 'spring', stiffness: 400, damping: 30 }} />
       )}
-      <motion.span whileTap={{ scale: 0.92 }} className={`relative z-10 flex items-center gap-1.5 text-[15px] font-semibold tracking-wide transition-colors ${active ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
-        {icon}
+      <motion.span whileTap={{ scale: 0.92 }} className={`relative z-10 text-[15px] font-semibold tracking-wide transition-colors ${active ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>
         {label}
       </motion.span>
     </Link>
   );
 }
 
-function MobileNavLink({ href, label, icon, onClick }: { href: string; label: string; icon: React.ReactNode; onClick: () => void }) {
+function MobileNavLink({ href, label, onClick }: { href: string; label: string; onClick: () => void }) {
   const pathname = usePathname();
   const active = pathname === href;
   return (
     <Link
       href={href}
       onClick={onClick}
-      className={`flex items-center gap-3 rounded-xl px-4 py-3 text-base font-semibold transition-colors ${
+      className={`rounded-xl px-4 py-3 text-base font-semibold transition-colors ${
         active ? 'bg-purple-500/10 text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'
       }`}
     >
-      {icon}
       {label}
     </Link>
   );
@@ -66,23 +63,19 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-1">
           <NavLink href="/challenges" label={t('challenges')} />
           {user && <NavLink href="/dashboard" label={t('dashboard')} />}
-          {user && <NavLink href="/leaderboard" label={t('leaderboard')} icon={<Trophy size={15} className="text-purple-400" />} />}
-          {user && <NavLink href="/announcements" label={t('announcements')} icon={<Megaphone size={15} className="text-purple-400" />} />}
+          {user && <NavLink href="/leaderboard" label={t('leaderboard')} />}
+          {user && <NavLink href="/announcements" label={t('announcements')} />}
+          {user && <NavLink href="/profile" label={t('profile')} />}
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
           <div className="hidden sm:block"><LanguageToggle /></div>
           <ThemeToggle />
           {user ? (
-            <>
-              <Link href="/profile" title={t('profile')} aria-label={t('profile')} className="hidden sm:block">
-                <AvatarCircle name={user.username} size={38} />
-              </Link>
-              <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={logout}
-                className="hidden text-sm font-semibold px-5 py-2.5 rounded-full glass text-slate-700 dark:text-slate-300 sm:block">
-                {t('logout')}
-              </motion.button>
-            </>
+            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={logout}
+              className="hidden text-sm font-semibold px-5 py-2.5 rounded-full glass text-slate-700 dark:text-slate-300 sm:block">
+              {t('logout')}
+            </motion.button>
           ) : (
             <div className="hidden sm:flex items-center gap-3">
               <Link href="/login">
@@ -118,10 +111,11 @@ export default function Navbar() {
             className="overflow-hidden border-t border-slate-200 dark:border-slate-700/50 md:hidden"
           >
             <div className="flex flex-col gap-1 p-4">
-              <MobileNavLink href="/challenges" label={t('challenges')} icon={<LayoutGrid size={17} className="text-purple-400" />} onClick={() => setMenuOpen(false)} />
-              {user && <MobileNavLink href="/dashboard" label={t('dashboard')} icon={<LayoutGrid size={17} className="text-purple-400" />} onClick={() => setMenuOpen(false)} />}
-              {user && <MobileNavLink href="/leaderboard" label={t('leaderboard')} icon={<Trophy size={17} className="text-purple-400" />} onClick={() => setMenuOpen(false)} />}
-              {user && <MobileNavLink href="/announcements" label={t('announcements')} icon={<Megaphone size={17} className="text-purple-400" />} onClick={() => setMenuOpen(false)} />}
+              <MobileNavLink href="/challenges" label={t('challenges')} onClick={() => setMenuOpen(false)} />
+              {user && <MobileNavLink href="/dashboard" label={t('dashboard')} onClick={() => setMenuOpen(false)} />}
+              {user && <MobileNavLink href="/leaderboard" label={t('leaderboard')} onClick={() => setMenuOpen(false)} />}
+              {user && <MobileNavLink href="/announcements" label={t('announcements')} onClick={() => setMenuOpen(false)} />}
+              {user && <MobileNavLink href="/profile" label={t('profile')} onClick={() => setMenuOpen(false)} />}
 
               <div className="my-2 border-t border-slate-200 dark:border-slate-700/50" />
 
@@ -131,15 +125,12 @@ export default function Navbar() {
               </div>
 
               {user ? (
-                <>
-                  <MobileNavLink href="/profile" label={t('profile')} icon={<AvatarCircle name={user.username} size={20} fontSize={10} />} onClick={() => setMenuOpen(false)} />
-                  <button
-                    onClick={() => { setMenuOpen(false); logout(); }}
-                    className="mt-1 rounded-xl px-4 py-3 text-start text-base font-semibold text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/50"
-                  >
-                    {t('logout')}
-                  </button>
-                </>
+                <button
+                  onClick={() => { setMenuOpen(false); logout(); }}
+                  className="mt-1 rounded-xl px-4 py-3 text-start text-base font-semibold text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/50"
+                >
+                  {t('logout')}
+                </button>
               ) : (
                 <div className="flex flex-col gap-2 px-4 pt-2">
                   <Link href="/login" onClick={() => setMenuOpen(false)} className="rounded-xl py-2.5 text-center font-semibold text-slate-700 dark:text-slate-300">

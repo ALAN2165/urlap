@@ -38,20 +38,30 @@ export async function me(req: AuthRequest, res: Response, next: NextFunction) {
 export async function stats(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const mine = await prisma.user.findUniqueOrThrow({ where: { id: req.userId }, select: { totalPoints: true } });
-    const [higherRanked, totalUsers, solvedChallenges, totalChallenges] = await Promise.all([
+    const [higherRanked, totalUsers, solvedChallenges, totalChallenges, acceptedSubmissions, gradedSubmissions] = await Promise.all([
       prisma.user.count({ where: { totalPoints: { gt: mine.totalPoints } } }),
       prisma.user.count(),
       prisma.challengeCompletion.count({ where: { userId: req.userId } }),
       prisma.challenge.count(),
+      prisma.submission.count({ where: { userId: req.userId, status: 'ACCEPTED' } }),
+      prisma.submission.count({ where: { userId: req.userId, status: { notIn: ['PENDING', 'RUNNING'] } } }),
     ]);
-    res.json({ totalPoints: mine.totalPoints, rank: higherRanked + 1, totalUsers, solvedChallenges, totalChallenges });
+
+    res.json({
+      totalPoints: mine.totalPoints,
+      rank: higherRanked + 1,
+      totalUsers,
+      solvedChallenges,
+      totalChallenges,
+      totalSubmissions: gradedSubmissions,
+      successRate: gradedSubmissions > 0 ? Math.round((acceptedSubmissions / gradedSubmissions) * 100) : 0,
+    });
   } catch (err) { next(err); }
 }
 
 export async function updateProfile(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { username, password, showInLeaderboard } = updateProfileSchema.parse(req.body);
-
     const data: { username?: string; passwordHash?: string; showInLeaderboard?: boolean } = {};
 
     if (username !== undefined) {
@@ -59,16 +69,10 @@ export async function updateProfile(req: AuthRequest, res: Response, next: NextF
       if (existing) return res.status(409).json({ error: 'That username is already taken.' });
       data.username = username;
     }
-    if (password !== undefined) {
-      data.passwordHash = await bcrypt.hash(password, 12);
-    }
-    if (showInLeaderboard !== undefined) {
-      data.showInLeaderboard = showInLeaderboard;
-    }
+    if (password !== undefined) data.passwordHash = await bcrypt.hash(password, 12);
+    if (showInLeaderboard !== undefined) data.showInLeaderboard = showInLeaderboard;
 
-    if (Object.keys(data).length === 0) {
-      return res.status(400).json({ error: 'Nothing to update.' });
-    }
+    if (Object.keys(data).length === 0) return res.status(400).json({ error: 'Nothing to update.' });
 
     const updated = await prisma.user.update({
       where: { id: req.userId },
@@ -78,7 +82,6 @@ export async function updateProfile(req: AuthRequest, res: Response, next: NextF
         totalPoints: true, preferredLang: true, showInLeaderboard: true, createdAt: true,
       },
     });
-
     res.json(updated);
   } catch (err) { next(err); }
 }

@@ -35,7 +35,6 @@ async function main() {
     );
   `);
 
-  // The grader role can never touch the app's own tables.
   await admin.query(`REVOKE ALL ON SCHEMA public FROM urlap_grader;`);
   await admin.query(`REVOKE ALL ON ALL TABLES IN SCHEMA public FROM urlap_grader;`);
   await admin.query(`GRANT USAGE ON SCHEMA playground TO urlap_grader;`);
@@ -43,9 +42,6 @@ async function main() {
   await admin.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA playground GRANT SELECT ON TABLES TO urlap_grader;`);
   await admin.query(`ALTER ROLE urlap_grader SET search_path = playground;`);
   await admin.query(`ALTER ROLE urlap_grader SET statement_timeout = '3000';`);
-
-  // Extra hardening now that the grader accepts arbitrary statement types
-  // (DO blocks, CREATE FUNCTION, etc.), not just SELECT:
   await admin.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC;`);
   await admin.query(`REVOKE CREATE ON SCHEMA playground FROM PUBLIC;`);
   await admin.query(`REVOKE TEMP ON DATABASE ${new URL(process.env.DATABASE_URL || '').pathname.replace('/', '')} FROM urlap_grader;`);
@@ -81,10 +77,11 @@ async function main() {
       (122, 'Kowalski',  'SA_REP',     8200, '2022-09-01', 0.20, 105, 30),
       (123, 'Sandoval',  'SA_REP',     6800, '2018-08-08', NULL, 105, 30),
       (124, 'Bautista',  'HR_REP',     7800, '2022-04-04', NULL, 100, 10),
-      (125, 'Fenn',      'SA_REP',     9900, '2017-02-20', 0.05, 105, 30);
+      (125, 'Fenn',      'SA_REP',     9900, '2017-02-20', 0.05, 105, 30),
+      (126, 'Higgins',   'FI_MGR',    15000, '2015-06-15', NULL, 100, 20);
   `);
 
-  console.log('✅ SQL playground ready: schema, table, role, grants, and 26 rows.');
+  console.log('✅ SQL playground ready: schema, table, role, grants, and 27 rows.');
   await admin.end();
 }
 

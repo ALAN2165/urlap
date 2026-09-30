@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
 import { useLocale, useTranslations } from 'next-intl';
 import { ArrowRight, CheckCircle2, Trophy, Zap } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -11,8 +11,8 @@ import { Lab, Stats } from '@/types';
 import ProgressRing from '@/components/dashboard/ProgressRing';
 import CountUp from '@/components/dashboard/CountUp';
 
-const stagger = { animate: { transition: { staggerChildren: 0.1 } } };
-const fadeUp = { initial: { opacity: 0, y: 32 }, animate: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } } };
+const stagger: Variants = { animate: { transition: { staggerChildren: 0.1 } } };
+const fadeUp: Variants = { initial: { opacity: 0, y: 32 }, animate: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } } };
 
 export default function DashboardPage() {
   const t = useTranslations('dashboard');

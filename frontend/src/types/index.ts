@@ -36,7 +36,9 @@ export interface Submission {
 }
 
 export interface Stats {
-  totalPoints: number; rank: number; totalUsers: number; solvedChallenges: number; totalChallenges: number;
+  totalPoints: number; rank: number; totalUsers: number;
+  solvedChallenges: number; totalChallenges: number;
+  totalSubmissions: number; successRate: number;
 }
 
 export interface LeaderboardEntry {
@@ -44,7 +46,6 @@ export interface LeaderboardEntry {
 }
 
 export type AnnouncementType = 'INFO' | 'NEW_LAB' | 'FEATURE' | 'MAINTENANCE';
-
 export interface Announcement {
   id: string; titleEn: string; titleAr: string; contentEn: string; contentAr: string;
   type: AnnouncementType; createdAt: string;

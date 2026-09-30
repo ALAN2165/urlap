@@ -72,7 +72,7 @@ export default function RegisterForm() {
           type="submit" disabled={isSubmitting}
           className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 to-purple-800 shadow-[0_10px_30px_rgba(147,51,234,0.3)] hover:shadow-[0_10px_40px_rgba(147,51,234,0.5)] transition-shadow disabled:opacity-50"
         >
-          {t('submit')}
+          {t('createAccount')}
           <ArrowRight size={18} className="rtl:rotate-180" />
         </motion.button>
       </form>

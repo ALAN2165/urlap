@@ -16,6 +16,9 @@
     "password": "Password",
     "username": "Username",
     "submit": "Submit",
+    "signIn": "Sign In",
+    "createAccount": "Create Account",
+    "forgotPassword": "Forgot password?",
     "noAccount": "Don't have an account?",
     "haveAccount": "Already have an account?",
     "login": "Login",
@@ -25,6 +28,14 @@
     "registerSuccess": "Account created! Please log in.",
     "loginFailed": "Login failed",
     "registerFailed": "Registration failed"
+  },
+  "forgotPassword": {
+    "title": "Reset your password",
+    "subtitle": "Enter your email and we'll send you instructions to reset your password.",
+    "email": "Email",
+    "submit": "Send reset link",
+    "success": "If an account with that email exists, you'll receive reset instructions shortly.",
+    "backToLogin": "Back to login"
   },
   "challenge": {
     "difficulty": "Difficulty",
@@ -107,7 +118,15 @@
     "leaderboardToggleDesc": "When off, your rank still counts, but you won't appear in the public list.",
     "usernameTaken": "That username is already taken.",
     "nothingToUpdate": "Nothing to update.",
-    "updateFailed": "Could not update your profile."
+    "updateFailed": "Could not update your profile.",
+    "changePhoto": "Change photo",
+    "avatarInvalidType": "Please choose an image file.",
+    "avatarTooLarge": "Image must be under 3MB.",
+    "avatarUpdated": "Profile picture updated.",
+    "avatarUploadFailed": "Could not upload your photo. Please try again.",
+    "statSolved": "Solved",
+    "statSuccessRate": "Success rate",
+    "statSubmissions": "Submissions"
   },
   "leaderboard": {
     "title": "Leaderboard",

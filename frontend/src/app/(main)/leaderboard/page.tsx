@@ -84,7 +84,7 @@ export default function LeaderboardPage() {
                 <span className={`w-8 text-center font-mono text-sm font-bold ${isTop3 ? RANK_ACCENT[entry.rank] : 'text-slate-400 dark:text-slate-500'}`}>
                   {entry.rank}
                 </span>
-                <AvatarCircle name={entry.username} size={36} />
+                <AvatarCircle name={entry.username} size={36} avatarUrl={entry.avatarUrl} />
                 <span className="flex-1 truncate font-semibold text-slate-900 dark:text-white">{entry.username}</span>
                 <span className="font-mono text-sm font-bold text-purple-600 dark:text-purple-400">{entry.totalPoints}</span>
               </motion.div>
@@ -95,7 +95,7 @@ export default function LeaderboardPage() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
               className="flex items-center gap-4 border-t-2 border-purple-500/30 bg-slate-100 px-5 py-3 dark:bg-slate-700/40">
               <span className="w-8 text-center font-mono text-sm font-bold text-slate-500 dark:text-slate-300">{stats.rank}</span>
-              <AvatarCircle name={user.username} size={36} />
+              <AvatarCircle name={user.username} size={36} avatarUrl={user.avatarUrl} />
               <span className="flex flex-1 items-center gap-2 truncate font-semibold text-slate-900 dark:text-white">
                 {user.username}
                 <span className="rounded-full bg-purple-500/15 px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400">{t('you')}</span>

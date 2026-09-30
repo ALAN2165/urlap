@@ -1,4 +1,3 @@
-// backend/src/app.ts
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -12,8 +11,6 @@ import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
-// Comma-separated list in the env var, e.g.:
-// FRONTEND_URL=https://frontend-8jdqsb88r-athae.vercel.app,http://localhost:3000
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
   .split(',')
   .map((s) => s.trim())
@@ -21,21 +18,19 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    // No origin header = same-origin/non-browser request (curl, health checks) — allow it.
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.warn(`CORS blocked request from origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
+    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+    else callback(new Error('Not allowed by CORS'));
   },
 };
 
 app.use(helmet());
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // explicit preflight handler — this is what fixes the 404 on OPTIONS
 app.use(morgan('dev'));
 app.use(express.json());
+
+// No static file route needed — avatars are stored as base64 data URIs
+// directly on the User row (see avatar.controller.ts), so there's no
+// file path that ever needs to be served from disk.
 
 app.use('/api/auth', authRoutes);
 app.use('/api/challenges', challengeRoutes);

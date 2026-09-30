@@ -50,7 +50,12 @@ export default function LoginForm() {
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}>
-          <label className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{t('password')}</label>
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{t('password')}</label>
+            <Link href="/forgot-password" className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline">
+              {t('forgotPassword')}
+            </Link>
+          </div>
           <div className="relative mt-2">
             <Lock size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 rtl:left-auto rtl:right-4" />
             <input {...register('password')} type="password"
@@ -67,7 +72,7 @@ export default function LoginForm() {
           type="submit" disabled={isSubmitting}
           className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 to-purple-800 shadow-[0_10px_30px_rgba(147,51,234,0.3)] hover:shadow-[0_10px_40px_rgba(147,51,234,0.5)] transition-shadow disabled:opacity-50"
         >
-          {t('submit')}
+          {t('signIn')}
           <ArrowRight size={18} className="rtl:rotate-180" />
         </motion.button>
       </form>

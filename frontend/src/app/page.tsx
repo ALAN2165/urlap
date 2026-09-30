@@ -1,3 +1,4 @@
+// frontend/src/app/page.tsx
 'use client';
 
 import Link from 'next/link';
@@ -111,19 +112,20 @@ export default function HomePage() {
           {t('subtitle')}
         </motion.p>
 
-        <motion.div variants={fadeUp} className="mb-12 flex w-full flex-col items-center gap-3 xs:w-auto xs:flex-row xs:flex-wrap xs:justify-center xs:gap-4 md:mb-16">
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }} className="w-full xs:w-auto">
+        {/* Normal-sized buttons: capped padding/text at md+, auto-width instead of stretching */}
+        <motion.div variants={fadeUp} className="mb-12 flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4 md:mb-16">
+          <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto">
             <Link
               href={user ? '/challenges' : '/register'}
-              className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-full bg-gradient-to-r from-purple-600 to-purple-800 px-8 py-3.5 font-bold text-white shadow-[0_0_25px_rgba(147,51,234,0.3)] transition-shadow duration-300 hover:shadow-[0_0_40px_rgba(147,51,234,0.55)] sm:px-9 sm:py-4"
+              className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-full bg-gradient-to-r from-purple-600 to-purple-800 px-6 py-3 text-[15px] font-bold text-white shadow-[0_0_18px_rgba(147,51,234,0.3)] transition-shadow duration-300 hover:shadow-[0_0_28px_rgba(147,51,234,0.5)] sm:w-auto"
             >
               <span className="relative z-10">{user ? t('ctaContinue') : t('ctaStart')}</span>
-              <ArrowRight size={18} className="relative z-10 transition-transform group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
+              <ArrowRight size={16} className="relative z-10 transition-transform group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
               <span className="pointer-events-none absolute inset-y-0 -left-full w-1/2 -skew-x-12 bg-white/25 blur-sm transition-transform duration-700 ease-out group-hover:translate-x-[400%]" />
             </Link>
           </motion.div>
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }} className="w-full xs:w-auto">
-            <Link href={user ? '/dashboard' : '/login'} className="glass flex w-full items-center justify-center rounded-full px-8 py-3.5 font-bold text-slate-900 dark:text-white sm:px-9 sm:py-4">
+          <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} className="w-full sm:w-auto">
+            <Link href={user ? '/dashboard' : '/login'} className="glass flex w-full items-center justify-center rounded-full px-6 py-3 text-[15px] font-bold text-slate-900 dark:text-white sm:w-auto">
               {user ? tn('dashboard') : tn('login')}
             </Link>
           </motion.div>
