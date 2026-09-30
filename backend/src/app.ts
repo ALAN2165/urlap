@@ -1,3 +1,4 @@
+// backend/src/app.ts
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -11,8 +12,28 @@ import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
+// Comma-separated list in the env var, e.g.:
+// FRONTEND_URL=https://frontend-8jdqsb88r-athae.vercel.app,http://localhost:3000
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // No origin header = same-origin/non-browser request (curl, health checks) — allow it.
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked request from origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+};
+
 app.use(helmet());
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // explicit preflight handler — this is what fixes the 404 on OPTIONS
 app.use(morgan('dev'));
 app.use(express.json());
 
