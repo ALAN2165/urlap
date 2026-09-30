@@ -18,19 +18,25 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-    else callback(new Error('Not allowed by CORS'));
+    // السماح للـ Localhost و أي رابط يتبع لـ Vercel تلقائياً (سواء Production أو Preview)
+    if (
+      !origin ||
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      origin.includes('localhost')
+    ) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
   },
+  credentials: true,
 };
 
 app.use(helmet());
 app.use(cors(corsOptions));
 app.use(morgan('dev'));
 app.use(express.json());
-
-// No static file route needed — avatars are stored as base64 data URIs
-// directly on the User row (see avatar.controller.ts), so there's no
-// file path that ever needs to be served from disk.
 
 app.use('/api/auth', authRoutes);
 app.use('/api/challenges', challengeRoutes);

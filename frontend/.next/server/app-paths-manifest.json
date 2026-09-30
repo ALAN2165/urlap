@@ -1,11 +1,11 @@
 {
-  "/(main)/announcements/page": "app/(main)/announcements/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(auth)/forgot-password/page": "app/(auth)/forgot-password/page.js",
   "/(main)/dashboard/page": "app/(main)/dashboard/page.js",
-  "/(main)/leaderboard/page": "app/(main)/leaderboard/page.js",
-  "/(main)/profile/page": "app/(main)/profile/page.js",
   "/(main)/challenges/[labSlug]/page": "app/(main)/challenges/[labSlug]/page.js",
   "/(main)/challenges/[labSlug]/[challengeSlug]/page": "app/(main)/challenges/[labSlug]/[challengeSlug]/page.js",
-  "/(main)/challenges/page": "app/(main)/challenges/page.js"
+  "/(main)/challenges/page": "app/(main)/challenges/page.js",
+  "/(main)/leaderboard/page": "app/(main)/leaderboard/page.js",
+  "/(main)/announcements/page": "app/(main)/announcements/page.js",
+  "/(main)/profile/page": "app/(main)/profile/page.js",
+  "/page": "app/page.js"
 }
