@@ -4,7 +4,7 @@ import { useId } from 'react';
 import { motion } from 'framer-motion';
 
 interface Props {
-  value: number; // 0..1
+  value: number;
   size?: number;
   stroke?: number;
   dim?: boolean;
@@ -22,24 +22,17 @@ export default function ProgressRing({ value, size = 120, stroke = 10, dim = fal
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" style={{ overflow: 'visible' }}>
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#14b8a6" />
-            <stop offset="100%" stopColor="#9333ea" />
+            <stop offset="0%" stopColor="#c084fc" />
+            <stop offset="100%" stopColor="#7e22ce" />
           </linearGradient>
         </defs>
-        <circle cx={center} cy={center} r={radius} fill="none" strokeWidth={stroke} className="stroke-slate-200 dark:stroke-white/10" />
+        <circle cx={center} cy={center} r={radius} fill="none" strokeWidth={stroke} className="stroke-slate-200 dark:stroke-slate-700/50" />
         {clamped > 0 && (
           <motion.circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            stroke={`url(#${gradientId})`}
-            strokeWidth={stroke}
-            strokeLinecap="round"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: clamped }}
-            transition={{ duration: 1.4, ease: 'easeOut' }}
-            style={{ filter: dim ? undefined : 'drop-shadow(0 0 6px rgba(20,184,166,0.5))' }}
+            cx={center} cy={center} r={radius} fill="none"
+            stroke={`url(#${gradientId})`} strokeWidth={stroke} strokeLinecap="round"
+            initial={{ pathLength: 0 }} animate={{ pathLength: clamped }} transition={{ duration: 1.4, ease: 'easeOut' }}
+            style={{ filter: dim ? undefined : 'drop-shadow(0 0 6px rgba(147,51,234,0.4))' }}
           />
         )}
       </svg>

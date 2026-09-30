@@ -53,10 +53,10 @@ export default function OutputPanel({ submission, running, nextHref }: Props) {
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: 'easeOut' }}
-      className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/[0.06] dark:bg-slate-950/70 dark:shadow-none">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-white/[0.06] dark:bg-white/[0.03]">
+      className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700/50 dark:bg-slate-900/60 dark:shadow-none">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-700/50 dark:bg-slate-800/40">
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-          <Terminal size={14} className="text-teal-500" />
+          <Terminal size={14} className="text-purple-400" />
           {t('title')}
         </div>
         {!inFlight && submission && (
@@ -74,11 +74,11 @@ export default function OutputPanel({ submission, running, nextHref }: Props) {
         {inFlight ? (
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              <Loader2 size={16} className="animate-spin text-teal-500" />
+              <Loader2 size={16} className="animate-spin text-purple-400" />
               {t('running')}
             </div>
             {[0, 1, 2].map((i) => (
-              <motion.div key={i} className="h-3 rounded bg-slate-200 dark:bg-white/[0.06]" style={{ width: `${90 - i * 18}%` }}
+              <motion.div key={i} className="h-3 rounded bg-slate-200 dark:bg-slate-700/50" style={{ width: `${90 - i * 18}%` }}
                 animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.15 }} />
             ))}
           </div>
@@ -109,13 +109,13 @@ export default function OutputPanel({ submission, running, nextHref }: Props) {
             )}
 
             {columns.length > 0 && (
-              <div dir="ltr" className="scroll-thin max-h-72 overflow-auto rounded-lg border border-slate-200 dark:border-white/[0.06]">
+              <div dir="ltr" className="scroll-thin max-h-72 overflow-auto rounded-lg border border-slate-200 dark:border-slate-700/50">
                 <table className="w-full border-collapse text-left font-mono text-xs">
                   <thead>
                     <tr>
-                      <th className="sticky top-0 z-10 w-10 border-b border-slate-200 bg-slate-100 px-3 py-2 text-right font-normal text-slate-400 dark:border-white/[0.06] dark:bg-slate-900">#</th>
+                      <th className="sticky top-0 z-10 w-10 border-b border-slate-200 bg-slate-100 px-3 py-2 text-right font-normal text-slate-400 dark:border-slate-700/50 dark:bg-slate-800">#</th>
                       {columns.map((col, i) => (
-                        <th key={i} className="sticky top-0 z-10 whitespace-nowrap border-b border-slate-200 bg-slate-100 px-3 py-2 font-semibold text-teal-700 dark:border-white/[0.06] dark:bg-slate-900 dark:text-teal-300">{col}</th>
+                        <th key={i} className="sticky top-0 z-10 whitespace-nowrap border-b border-slate-200 bg-slate-100 px-3 py-2 font-semibold text-purple-700 dark:border-slate-700/50 dark:bg-slate-800 dark:text-purple-300">{col}</th>
                       ))}
                     </tr>
                   </thead>
@@ -125,10 +125,10 @@ export default function OutputPanel({ submission, running, nextHref }: Props) {
                     )}
                     {rows.map((row, ri) => (
                       <motion.tr key={ri} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(ri, 14) * 0.03, duration: 0.25 }}
-                        className="border-b border-slate-100 even:bg-slate-50/70 hover:bg-teal-500/5 dark:border-white/[0.04] dark:even:bg-white/[0.02]">
+                        className="border-b border-slate-100 even:bg-slate-50/70 hover:bg-purple-500/5 dark:border-slate-800/60 dark:even:bg-slate-800/30">
                         <td className="select-none px-3 py-1.5 text-right text-slate-400 dark:text-slate-500">{ri + 1}</td>
                         {row.map((cell, ci) => (
-                          <td key={ci} className={`whitespace-nowrap px-3 py-1.5 ${typeof cell === 'number' ? 'text-right text-purple-700 dark:text-purple-300' : 'text-slate-800 dark:text-slate-200'}`}>
+                          <td key={ci} className={`whitespace-nowrap px-3 py-1.5 ${typeof cell === 'number' ? 'text-right text-slate-700 dark:text-slate-300' : 'text-slate-800 dark:text-slate-200'}`}>
                             <Cell value={cell} />
                           </td>
                         ))}
@@ -148,7 +148,7 @@ export default function OutputPanel({ submission, running, nextHref }: Props) {
 
             {nextHref && (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                <Link href={nextHref} className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-500 to-purple-600 px-6 py-2.5 text-sm font-bold text-white shadow-[0_0_24px_rgba(20,184,166,0.35)] transition-transform hover:-translate-y-0.5">
+                <Link href={nextHref} className="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-purple-800 px-6 py-2.5 text-sm font-bold text-white shadow-[0_0_20px_rgba(147,51,234,0.3)] transition-transform hover:-translate-y-0.5">
                   {t('nextChallenge')}
                   <ArrowRight size={16} className="transition-transform group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" />
                 </Link>

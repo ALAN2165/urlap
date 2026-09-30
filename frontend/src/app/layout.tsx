@@ -24,8 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <QueryProvider>
               <div className="relative min-h-screen bg-mesh">
                 <Navbar />
-                <main className="relative z-10 pt-24 min-h-screen">{children}</main>
-              </div>
+<main className="relative z-10 pt-20 md:pt-24 min-h-screen">{children}</main>              </div>
               <Toaster richColors position="top-center" />
             </QueryProvider>
           </IntlProvider>

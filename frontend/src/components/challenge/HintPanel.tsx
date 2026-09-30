@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lightbulb, Lock } from 'lucide-react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { HintMeta, HintRevealed } from '@/types';
 
 export default function HintPanel({ hints }: { hints: HintMeta[] }) {
   const locale = useLocale();
+  const t = useTranslations('challenge');
   const [revealed, setRevealed] = useState<Record<string, HintRevealed>>({});
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
@@ -28,9 +29,9 @@ export default function HintPanel({ hints }: { hints: HintMeta[] }) {
 
   return (
     <div className="space-y-3">
-      <h3 className="font-sans font-bold flex items-center gap-2 text-slate-900 dark:text-white">
-        <Lightbulb size={18} className="text-teal-500 dark:text-teal-400" />
-        Hints
+      <h3 className="font-bold flex items-center gap-2 text-slate-900 dark:text-white">
+        <Lightbulb size={18} className="text-purple-400" />
+        {t('hints')}
       </h3>
 
       {sorted.map((hint, i) => {
@@ -42,16 +43,16 @@ export default function HintPanel({ hints }: { hints: HintMeta[] }) {
             <button
               onClick={() => !isRevealed && prevRevealed && reveal(hint.id)}
               disabled={isRevealed || !prevRevealed || loadingId === hint.id}
-              className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-slate-700 dark:text-white/80 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-all duration-300"
+              className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 disabled:cursor-not-allowed disabled:opacity-50 hover:bg-slate-100 dark:hover:bg-slate-800/40 transition-all duration-300"
             >
-              <span>Hint {hint.order} {!isRevealed && `(−${hint.pointPenalty} pts)`}</span>
+              <span>{t('hintLabel')} {hint.order} {!isRevealed && `(−${hint.pointPenalty} pts)`}</span>
               {!prevRevealed && !isRevealed ? <Lock size={14} /> : null}
-              {loadingId === hint.id && <span className="text-xs">Loading…</span>}
+              {loadingId === hint.id && <span className="text-xs">{t('loading')}</span>}
             </button>
             <AnimatePresence>
               {isRevealed && (
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                  className="px-4 pb-3 text-sm text-slate-600 dark:text-white/60">
+                  className="px-4 pb-3 text-sm text-slate-600 dark:text-slate-400">
                   {locale === 'ar' ? revealed[hint.id].contentAr : revealed[hint.id].contentEn}
                 </motion.div>
               )}

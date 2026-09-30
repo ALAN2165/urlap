@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
-import { Trophy, Megaphone } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Trophy, Megaphone, Menu, X, LayoutGrid } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import LanguageToggle from './LanguageToggle';
 import LogoOrb from '@/components/shared/LogoOrb';
@@ -30,16 +30,37 @@ function NavLink({ href, label, icon }: { href: string; label: string; icon?: Re
   );
 }
 
+function MobileNavLink({ href, label, icon, onClick }: { href: string; label: string; icon: React.ReactNode; onClick: () => void }) {
+  const pathname = usePathname();
+  const active = pathname === href;
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className={`flex items-center gap-3 rounded-xl px-4 py-3 text-base font-semibold transition-colors ${
+        active ? 'bg-purple-500/10 text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'
+      }`}
+    >
+      {icon}
+      {label}
+    </Link>
+  );
+}
+
 export default function Navbar() {
   const t = useTranslations('nav');
   const { user, logout } = useAuth();
+  const pathname = usePathname();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => setMenuOpen(false), [pathname]);
 
   return (
     <motion.nav initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.6, ease: 'easeOut' }}
-      className="fixed top-0 w-full z-50 h-24 flex items-center glass">
-      <div className="max-w-7xl mx-auto px-8 w-full flex items-center justify-between">
+      className="fixed top-0 w-full z-50 glass">
+      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 md:h-24 lg:px-8">
         <Link href="/">
-          <LogoOrb size={76} imgSize={46} />
+          <LogoOrb size={60} imgSize={36} />
         </Link>
 
         <div className="hidden md:flex items-center gap-1">
@@ -49,35 +70,90 @@ export default function Navbar() {
           {user && <NavLink href="/announcements" label={t('announcements')} icon={<Megaphone size={15} className="text-purple-400" />} />}
         </div>
 
-        <div className="flex items-center gap-4">
-          <LanguageToggle />
+        <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+          <div className="hidden sm:block"><LanguageToggle /></div>
           <ThemeToggle />
           {user ? (
             <>
-              <Link href="/profile" title={t('profile')} aria-label={t('profile')}>
+              <Link href="/profile" title={t('profile')} aria-label={t('profile')} className="hidden sm:block">
                 <AvatarCircle name={user.username} size={38} />
               </Link>
               <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={logout}
-                className="text-sm font-semibold px-5 py-2.5 rounded-full glass text-slate-700 dark:text-slate-300">
+                className="hidden text-sm font-semibold px-5 py-2.5 rounded-full glass text-slate-700 dark:text-slate-300 sm:block">
                 {t('logout')}
               </motion.button>
             </>
           ) : (
-            <>
+            <div className="hidden sm:flex items-center gap-3">
               <Link href="/login">
                 <motion.span whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.92 }} className="inline-block text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-semibold text-[15px] px-4 py-2.5">
                   {t('login')}
                 </motion.span>
               </Link>
               <Link href="/register">
-                <motion.span whileHover={{ scale: 1.06, y: -2 }} whileTap={{ scale: 0.94 }} className="inline-block bg-gradient-to-r from-purple-500 to-purple-700 text-white font-bold text-[15px] shadow-[0_0_20px_rgba(168,85,247,0.35)] rounded-full px-7 py-3">
+                <motion.span whileHover={{ scale: 1.06, y: -2 }} whileTap={{ scale: 0.94 }} className="inline-block bg-gradient-to-r from-purple-600 to-purple-800 text-white font-bold text-[15px] shadow-[0_0_20px_rgba(147,51,234,0.35)] rounded-full px-7 py-3">
                   {t('register')}
                 </motion.span>
               </Link>
-            </>
+            </div>
           )}
+
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Toggle menu"
+            className="flex h-10 w-10 items-center justify-center rounded-full glass md:hidden"
+          >
+            {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="overflow-hidden border-t border-slate-200 dark:border-slate-700/50 md:hidden"
+          >
+            <div className="flex flex-col gap-1 p-4">
+              <MobileNavLink href="/challenges" label={t('challenges')} icon={<LayoutGrid size={17} className="text-purple-400" />} onClick={() => setMenuOpen(false)} />
+              {user && <MobileNavLink href="/dashboard" label={t('dashboard')} icon={<LayoutGrid size={17} className="text-purple-400" />} onClick={() => setMenuOpen(false)} />}
+              {user && <MobileNavLink href="/leaderboard" label={t('leaderboard')} icon={<Trophy size={17} className="text-purple-400" />} onClick={() => setMenuOpen(false)} />}
+              {user && <MobileNavLink href="/announcements" label={t('announcements')} icon={<Megaphone size={17} className="text-purple-400" />} onClick={() => setMenuOpen(false)} />}
+
+              <div className="my-2 border-t border-slate-200 dark:border-slate-700/50" />
+
+              <div className="flex items-center justify-between px-4 py-1 sm:hidden">
+                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Language</span>
+                <LanguageToggle />
+              </div>
+
+              {user ? (
+                <>
+                  <MobileNavLink href="/profile" label={t('profile')} icon={<AvatarCircle name={user.username} size={20} fontSize={10} />} onClick={() => setMenuOpen(false)} />
+                  <button
+                    onClick={() => { setMenuOpen(false); logout(); }}
+                    className="mt-1 rounded-xl px-4 py-3 text-start text-base font-semibold text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/50"
+                  >
+                    {t('logout')}
+                  </button>
+                </>
+              ) : (
+                <div className="flex flex-col gap-2 px-4 pt-2">
+                  <Link href="/login" onClick={() => setMenuOpen(false)} className="rounded-xl py-2.5 text-center font-semibold text-slate-700 dark:text-slate-300">
+                    {t('login')}
+                  </Link>
+                  <Link href="/register" onClick={() => setMenuOpen(false)} className="rounded-xl bg-gradient-to-r from-purple-600 to-purple-800 py-3 text-center font-bold text-white">
+                    {t('register')}
+                  </Link>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.nav>
   );
 }

@@ -14,24 +14,19 @@ export default function CodeEditor({ value, onChange, language }: Props) {
 
   return (
     <div className="rounded-2xl overflow-hidden glass">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-white/[0.06]">
+      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-200 dark:border-slate-700/50">
         <span className="w-3 h-3 rounded-full bg-red-400/70" />
         <span className="w-3 h-3 rounded-full bg-amber-400/70" />
-        <span className="w-3 h-3 rounded-full bg-teal-400/70" />
-        <span className="ml-2 text-xs font-mono text-slate-500 dark:text-white/40">query.sql</span>
+        <span className="w-3 h-3 rounded-full bg-purple-400/70" />
+        <span className="ml-2 text-xs font-mono text-slate-500 dark:text-slate-500">query.sql</span>
       </div>
       <Editor
-        height="460px"
+        height="420px"
         language="sql"
         value={value}
         onChange={(val) => onChange(val || '')}
         theme={resolvedTheme === 'dark' ? 'vs-dark' : 'vs-light'}
-        options={{
-          fontSize: 16,
-          minimap: { enabled: false },
-          scrollBeyondLastLine: false,
-          padding: { top: 16 },
-        }}
+        options={{ fontSize: 15, minimap: { enabled: false }, scrollBeyondLastLine: false, padding: { top: 16 } }}
       />
     </div>
   );
