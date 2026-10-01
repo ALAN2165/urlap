@@ -43,7 +43,7 @@ export async function adminCreateLab(req: AuthRequest, res: Response, next: Next
 export async function adminUpdateLab(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const data = adminLabSchema.parse(req.body);
-    const lab = await prisma.lab.update({ where: { id: req.params.id }, data: { titleEn: data.titleEn, titleAr: data.titleAr } });
+    const lab = await prisma.lab.update({ where: { id: req.params.id as string }, data: { titleEn: data.titleEn, titleAr: data.titleAr } });
     res.json(lab);
   } catch (err) { next(err); }
 }
@@ -51,7 +51,7 @@ export async function adminUpdateLab(req: AuthRequest, res: Response, next: Next
 export async function adminGetChallenge(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const challenge = await prisma.challenge.findUniqueOrThrow({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string},
       include: { hints: { orderBy: { order: 'asc' } } },
     });
     res.json(challenge);
@@ -103,9 +103,9 @@ export async function adminUpdateChallenge(req: AuthRequest, res: Response, next
     }
 
     await prisma.$transaction([
-      prisma.hint.deleteMany({ where: { challengeId: req.params.id } }),
+      prisma.hint.deleteMany({ where: { challengeId: req.params.id as string} }),
       prisma.challenge.update({
-        where: { id: req.params.id },
+        where: { id: req.params.id as string },
         data: {
           titleEn: data.titleEn,
           titleAr: data.titleAr,
@@ -123,7 +123,7 @@ export async function adminUpdateChallenge(req: AuthRequest, res: Response, next
     ]);
 
     const updated = await prisma.challenge.findUniqueOrThrow({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: { hints: { orderBy: { order: 'asc' } } },
     });
     res.json(updated);
@@ -132,7 +132,7 @@ export async function adminUpdateChallenge(req: AuthRequest, res: Response, next
 
 export async function adminDeleteChallenge(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    await prisma.challenge.delete({ where: { id: req.params.id } });
+    await prisma.challenge.delete({ where: { id: req.params.id as string} });
     res.status(204).send();
   } catch (err) { next(err); }
 }
