@@ -28,7 +28,8 @@ export async function me(req: AuthRequest, res: Response, next: NextFunction) {
       where: { id: req.userId },
       select: {
         id: true, username: true, email: true, avatarUrl: true,
-        totalPoints: true, preferredLang: true, showInLeaderboard: true, createdAt: true,
+        totalPoints: true, preferredLang: true, showInLeaderboard: true,
+        role: true, createdAt: true,
       },
     });
     res.json(user);
@@ -79,7 +80,8 @@ export async function updateProfile(req: AuthRequest, res: Response, next: NextF
       data,
       select: {
         id: true, username: true, email: true, avatarUrl: true,
-        totalPoints: true, preferredLang: true, showInLeaderboard: true, createdAt: true,
+        totalPoints: true, preferredLang: true, showInLeaderboard: true,
+        role: true, createdAt: true,
       },
     });
     res.json(updated);

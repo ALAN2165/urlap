@@ -1,4 +1,3 @@
-// backend/src/services/auth.service.ts
 import bcrypt from 'bcryptjs';
 import { prisma } from '../config/db';
 import { signToken } from '../utils/jwt';
@@ -11,9 +10,7 @@ export async function registerUser(username: string, email: string, password: st
     throw err;
   }
   const passwordHash = await bcrypt.hash(password, 12);
-  const user = await prisma.user.create({
-    data: { username, email, passwordHash },
-  });
+  const user = await prisma.user.create({ data: { username, email, passwordHash } });
   const token = signToken(user.id);
   return { user: sanitize(user), token };
 }
@@ -29,6 +26,11 @@ export async function loginUser(email: string, password: string) {
   if (!valid) {
     const err: any = new Error('Invalid credentials');
     err.status = 401;
+    throw err;
+  }
+  if (user.isBanned) {
+    const err: any = new Error('Your account has been suspended.');
+    err.status = 403;
     throw err;
   }
   const token = signToken(user.id);

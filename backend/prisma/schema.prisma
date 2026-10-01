@@ -43,6 +43,11 @@ enum AnnouncementType {
   MAINTENANCE
 }
 
+enum Role {
+  STUDENT
+  ADMIN
+}
+
 model User {
   id                String   @id @default(cuid())
   username          String   @unique
@@ -52,6 +57,8 @@ model User {
   totalPoints       Int      @default(0)
   preferredLang     String   @default("en")
   showInLeaderboard Boolean  @default(true)
+  role              Role     @default(STUDENT)
+  isBanned          Boolean  @default(false)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

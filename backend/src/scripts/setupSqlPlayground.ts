@@ -44,17 +44,29 @@ async function main() {
   await admin.query(`ALTER ROLE urlap_grader SET statement_timeout = '8000';`);
   await admin.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC;`);
   await admin.query(`REVOKE TEMP ON DATABASE ${new URL(process.env.DATABASE_URL || '').pathname.replace('/', '')} FROM urlap_grader;`);
-
-  // NEW: lets submitted scripts actually CREATE FUNCTION/PROCEDURE/TABLE —
-  // but only inside the throwaway `playground` schema, never `public`
-  // (where the real app tables live). Combined with "always rollback" in
-  // sqlGrader.service.ts, nothing from this is ever persisted.
   await admin.query(`GRANT CREATE ON SCHEMA playground TO urlap_grader;`);
   try {
     await admin.query(`GRANT USAGE ON LANGUAGE plpgsql TO urlap_grader;`);
   } catch (err) {
-    console.warn('  (non-fatal) could not grant plpgsql usage — likely already granted to PUBLIC by default:', (err as Error).message);
+    console.warn('  (non-fatal) could not grant plpgsql usage:', (err as Error).message);
   }
+
+  console.log('🧩 Installing Oracle-compatibility helper functions (NVL, NVL2)...');
+
+  await admin.query(`
+    CREATE OR REPLACE FUNCTION playground.nvl(anyelement, anyelement)
+    RETURNS anyelement AS $$
+      SELECT COALESCE($1, $2);
+    $$ LANGUAGE sql IMMUTABLE;
+  `);
+  await admin.query(`
+    CREATE OR REPLACE FUNCTION playground.nvl2(anyelement, anyelement, anyelement)
+    RETURNS anyelement AS $$
+      SELECT CASE WHEN $1 IS NOT NULL THEN $2 ELSE $3 END;
+    $$ LANGUAGE sql IMMUTABLE;
+  `);
+  await admin.query(`GRANT EXECUTE ON FUNCTION playground.nvl(anyelement, anyelement) TO urlap_grader;`);
+  await admin.query(`GRANT EXECUTE ON FUNCTION playground.nvl2(anyelement, anyelement, anyelement) TO urlap_grader;`);
 
   console.log('🌱 Inserting dummy employee rows...');
 
@@ -91,7 +103,7 @@ async function main() {
       (126, 'Higgins',   'FI_MGR',    15000, '2015-06-15', NULL, 100, 20);
   `);
 
-  console.log('✅ SQL playground ready: schema, table, role, grants, and 27 rows.');
+  console.log('✅ SQL playground ready: schema, table, role, grants, compatibility functions, and 27 rows.');
   await admin.end();
 }
 
