@@ -1,7 +1,9 @@
-// backend/src/index.ts
 import 'dotenv/config';
 import app from './app';
-const port = process.env.PORT || 8080;
+// import './queues/executionWorker'; // تأكد إن السطر ده لسه معمول له تعليق (Comment) عشان السيرفر ما يقعش
+
+const port = Number(process.env.PORT) || 8080;
+
 app.listen(port, '0.0.0.0', () => {
   console.log(`🚀 urlap API running on port ${port}`);
 });
