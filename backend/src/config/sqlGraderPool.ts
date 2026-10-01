@@ -14,4 +14,5 @@ export const graderPool = new Pool({
   connectionTimeoutMillis: 4000,
   statement_timeout: 9000,
   query_timeout: 10000,
+  options: '-c search_path=playground,public', // السطر ده هو اللي هيخليه يشוף الجدول أوتوماتيك من غير إيرور
 });
