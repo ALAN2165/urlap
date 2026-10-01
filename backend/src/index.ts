@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import './queues/executionWorker'; // شيل علامتين التعليق من هنا
 import app from './app';
 // import './queues/executionWorker'; // تأكد إن السطر ده لسه معمول له تعليق (Comment) عشان السيرفر ما يقعش
 
