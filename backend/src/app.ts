@@ -18,10 +18,8 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
   .filter(Boolean);
 
 const corsOptions: cors.CorsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-    else callback(new Error('Not allowed by CORS'));
-  },
+  origin: true, // بيسمح لأي موقع يكلم السيرفر من غير شروط معقدة
+  credentials: true,
 };
 
 app.use(helmet());
