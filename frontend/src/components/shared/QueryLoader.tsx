@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocale } from 'next-intl';
 import { Database } from 'lucide-react';
+import IndeterminateBar from './IndeterminateBar';
 
 const MESSAGES: Record<string, string[]> = {
   en: ['Connecting to database…', 'Parsing query…', 'Optimizing execution plan…', 'Fetching rows…', 'Almost there…'],
@@ -31,7 +32,7 @@ export default function QueryLoader({ compact = false }: { compact?: boolean }) 
         <Database size={22} className="text-purple-400" />
       </div>
 
-      <div className="flex items-center gap-1 font-mono text-sm text-slate-500 dark:text-slate-400">
+      <div className="mb-4 flex items-center gap-1 font-mono text-sm text-slate-500 dark:text-slate-400">
         <span className="text-purple-400">{'>'}</span>
         <AnimatePresence mode="wait">
           <motion.span
@@ -51,16 +52,7 @@ export default function QueryLoader({ compact = false }: { compact?: boolean }) 
         />
       </div>
 
-      <div className="mt-4 flex gap-1.5">
-        {[0, 1, 2].map((i) => (
-          <motion.span
-            key={i}
-            className="h-1.5 w-1.5 rounded-full bg-purple-400"
-            animate={{ opacity: [0.3, 1, 0.3] }}
-            transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
-          />
-        ))}
-      </div>
+      <IndeterminateBar className="w-48" />
     </div>
   );
 }

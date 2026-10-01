@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { Terminal, CheckCircle2, XCircle, Clock, Loader2, ArrowRight, Sparkles } from 'lucide-react';
 import { Submission } from '@/types';
+import IndeterminateBar from '@/components/shared/IndeterminateBar';
 
 const ROW_CAP = 1000;
 
@@ -72,15 +73,12 @@ export default function OutputPanel({ submission, running, nextHref }: Props) {
 
       <div className="p-4">
         {inFlight ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
               <Loader2 size={16} className="animate-spin text-purple-400" />
               {t('running')}
             </div>
-            {[0, 1, 2].map((i) => (
-              <motion.div key={i} className="h-3 rounded bg-slate-200 dark:bg-slate-700/50" style={{ width: `${90 - i * 18}%` }}
-                animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.15 }} />
-            ))}
+            <IndeterminateBar />
           </div>
         ) : submission ? (
           <div className="space-y-3">

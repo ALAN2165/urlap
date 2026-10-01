@@ -1,4 +1,8 @@
 {
-  "/page": "app/page.js",
-  "/(main)/challenges/page": "app/(main)/challenges/page.js"
+  "/(main)/dashboard/page": "app/(main)/dashboard/page.js",
+  "/(main)/profile/page": "app/(main)/profile/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/admin/challenges/page": "app/admin/challenges/page.js",
+  "/admin/users/page": "app/admin/users/page.js",
+  "/admin/announcements/page": "app/admin/announcements/page.js"
 }

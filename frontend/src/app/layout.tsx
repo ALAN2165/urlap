@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Playfair_Display, Alexandria } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from 'sonner';
-import Navbar from '@/components/layout/Navbar';
+import AppShell from '@/components/layout/AppShell';
 import QueryProvider from '@/components/shared/QueryProvider';
 import IntlProvider from '@/components/shared/IntlProvider';
 import './globals.css';
@@ -22,9 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <IntlProvider>
             <QueryProvider>
-              <div className="relative min-h-screen bg-mesh">
-                <Navbar />
-<main className="relative z-10 pt-20 md:pt-24 min-h-screen">{children}</main>              </div>
+              <AppShell>{children}</AppShell>
               <Toaster richColors position="top-center" />
             </QueryProvider>
           </IntlProvider>

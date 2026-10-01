@@ -12,9 +12,9 @@ const fadeUp = { initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0, tr
 
 const TYPE_META: Record<AnnouncementType, { Icon: typeof Info; className: string }> = {
   INFO: { Icon: Info, className: 'bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20' },
-  NEW_LAB: { Icon: Rocket, className: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20' },
-  FEATURE: { Icon: Sparkles, className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
-  MAINTENANCE: { Icon: Wrench, className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
+  NEW_LAB: { Icon: Rocket, className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20' },
+  FEATURE: { Icon: Sparkles, className: 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20' },
+  MAINTENANCE: { Icon: Wrench, className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20' },
 };
 
 export default function AnnouncementsPage() {
@@ -30,10 +30,10 @@ export default function AnnouncementsPage() {
     type === 'NEW_LAB' ? t('badgeNewLab') : type === 'FEATURE' ? t('badgeFeature') : type === 'MAINTENANCE' ? t('badgeMaintenance') : t('badgeInfo');
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10">
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 md:py-12">
       <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-8 text-center">
-        <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-purple-600 shadow-[0_0_30px_rgba(20,184,166,0.35)]">
-          <Megaphone size={24} className="text-white" />
+        <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-purple-500/10">
+          <Megaphone size={22} className="text-purple-400" />
         </div>
         <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white">{t('title')}</h1>
         <p className="mt-1 text-slate-600 dark:text-slate-400">{t('subtitle')}</p>
@@ -41,7 +41,7 @@ export default function AnnouncementsPage() {
 
       {isLoading && (
         <div className="space-y-4">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-28 animate-pulse rounded-3xl bg-slate-200 dark:bg-white/[0.06]" />)}
+          {[...Array(3)].map((_, i) => <div key={i} className="h-28 animate-pulse rounded-3xl bg-slate-200 dark:bg-slate-800/50" />)}
         </div>
       )}
 

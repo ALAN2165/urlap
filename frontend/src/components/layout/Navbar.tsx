@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Shield } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import LanguageToggle from './LanguageToggle';
 import LogoOrb from '@/components/shared/LogoOrb';
@@ -49,6 +49,7 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const isAdmin = user?.role === 'ADMIN';
 
   useEffect(() => setMenuOpen(false), [pathname]);
 
@@ -57,7 +58,8 @@ export default function Navbar() {
       className="fixed top-0 w-full z-50 glass">
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6 md:h-24 lg:px-8">
         <Link href="/">
-<LogoOrb size={72} imgSize={44} float={false} />        </Link>
+          <LogoOrb size={72} imgSize={44} float={false} />
+        </Link>
 
         <div className="hidden md:flex items-center gap-1">
           <NavLink href="/challenges" label={t('challenges')} />
@@ -65,6 +67,18 @@ export default function Navbar() {
           {user && <NavLink href="/leaderboard" label={t('leaderboard')} />}
           {user && <NavLink href="/announcements" label={t('announcements')} />}
           {user && <NavLink href="/profile" label={t('profile')} />}
+          {isAdmin && (
+            <Link href="/admin" className="ml-1">
+              <motion.span
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.92 }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-purple-400/40 bg-purple-500/10 px-4 py-2 text-[13px] font-bold text-purple-600 dark:text-purple-400"
+              >
+                <Shield size={14} />
+                Admin
+              </motion.span>
+            </Link>
+          )}
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
@@ -115,6 +129,17 @@ export default function Navbar() {
               {user && <MobileNavLink href="/leaderboard" label={t('leaderboard')} onClick={() => setMenuOpen(false)} />}
               {user && <MobileNavLink href="/announcements" label={t('announcements')} onClick={() => setMenuOpen(false)} />}
               {user && <MobileNavLink href="/profile" label={t('profile')} onClick={() => setMenuOpen(false)} />}
+
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  onClick={() => setMenuOpen(false)}
+                  className="mt-1 flex items-center gap-3 rounded-xl border border-purple-400/30 bg-purple-500/10 px-4 py-3 text-base font-bold text-purple-600 dark:text-purple-400"
+                >
+                  <Shield size={17} />
+                  Admin Dashboard
+                </Link>
+              )}
 
               <div className="my-2 border-t border-slate-200 dark:border-slate-700/50" />
 
