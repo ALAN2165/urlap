@@ -26,8 +26,7 @@ const corsOptions: cors.CorsOptions = {
 
 app.use(helmet());
 app.use(cors(corsOptions));
-app.options('.*', cors(corsOptions));
-app.use(morgan('dev'));
+app.options('/*', cors(corsOptions));app.use(morgan('dev'));
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
