@@ -1,5 +1,5 @@
 'use client';
-
+import QueryLoader from '@/components/shared/QueryLoader';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -106,8 +106,7 @@ export default function ChallengeSolvePage() {
   }
 
   if (isError) return <div className="mx-auto max-w-7xl px-4 py-12 text-red-600 dark:text-red-400 sm:px-6">{t('loadFailed')}</div>;
-  if (!challenge) return <div className="mx-auto max-w-7xl px-4 py-12 text-slate-500 dark:text-slate-400 sm:px-6">{t('loading')}</div>;
-
+if (!challenge) return <QueryLoader />;
   if (challenge.locked) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-20 text-center sm:px-6 sm:py-24">

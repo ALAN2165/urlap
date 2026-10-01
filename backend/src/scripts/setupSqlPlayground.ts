@@ -41,10 +41,20 @@ async function main() {
   await admin.query(`GRANT SELECT ON ALL TABLES IN SCHEMA playground TO urlap_grader;`);
   await admin.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA playground GRANT SELECT ON TABLES TO urlap_grader;`);
   await admin.query(`ALTER ROLE urlap_grader SET search_path = playground;`);
-  await admin.query(`ALTER ROLE urlap_grader SET statement_timeout = '3000';`);
+  await admin.query(`ALTER ROLE urlap_grader SET statement_timeout = '8000';`);
   await admin.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC;`);
-  await admin.query(`REVOKE CREATE ON SCHEMA playground FROM PUBLIC;`);
   await admin.query(`REVOKE TEMP ON DATABASE ${new URL(process.env.DATABASE_URL || '').pathname.replace('/', '')} FROM urlap_grader;`);
+
+  // NEW: lets submitted scripts actually CREATE FUNCTION/PROCEDURE/TABLE —
+  // but only inside the throwaway `playground` schema, never `public`
+  // (where the real app tables live). Combined with "always rollback" in
+  // sqlGrader.service.ts, nothing from this is ever persisted.
+  await admin.query(`GRANT CREATE ON SCHEMA playground TO urlap_grader;`);
+  try {
+    await admin.query(`GRANT USAGE ON LANGUAGE plpgsql TO urlap_grader;`);
+  } catch (err) {
+    console.warn('  (non-fatal) could not grant plpgsql usage — likely already granted to PUBLIC by default:', (err as Error).message);
+  }
 
   console.log('🌱 Inserting dummy employee rows...');
 

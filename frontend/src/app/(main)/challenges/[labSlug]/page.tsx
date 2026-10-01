@@ -1,5 +1,5 @@
 'use client';
-
+import QueryLoader from '@/components/shared/QueryLoader';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -14,7 +14,7 @@ export default function LabPage() {
     queryFn: async () => (await api.get(`/challenges/labs/${labSlug}`)).data,
   });
 
-  if (isLoading || !lab) return <div className="max-w-6xl mx-auto px-6 py-12 text-slate-500 dark:text-white/50">Loading…</div>;
+if (isLoading || !lab) return <QueryLoader />;
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-12">
