@@ -3,7 +3,7 @@ import { graderPool } from '../config/sqlGraderPool';
 
 const FETCH_LIMIT = 1000;
 const DISPLAY_LIMIT = 100;
-const STATEMENT_TIMEOUT_MS = 8000; // generous enough for loops/PL-pgSQL, still bounded
+const STATEMENT_TIMEOUT_MS = 8000;
 
 export interface GradeResult {
   passed: boolean;
@@ -30,15 +30,6 @@ function emptyResult(start: number, status: GradeResult['status'], errorMessage:
   };
 }
 
-/**
- * Splits a SQL script into top-level statements. Unlike a naive split on ';',
- * this correctly treats semicolons INSIDE single/double-quoted strings and
- * dollar-quoted blocks ($$ ... $$ or $tag$ ... $tag$ — how PL/pgSQL function,
- * procedure, and DO-block bodies are written) as part of the surrounding
- * statement, not as separators. Without this, a single `DO $$ BEGIN ... END $$;`
- * block — which legitimately contains many internal semicolons — was being
- * rejected as "multiple statements", which is why PL/pgSQL submissions failed.
- */
 function splitStatements(sql: string): string[] {
   const statements: string[] = [];
   let current = '';
@@ -154,10 +145,6 @@ async function runCursor(client: PoolClient, sql: string): Promise<QueryOutput> 
   return { columns: res.fields.map((f) => f.name), rows: res.rows as unknown[][] };
 }
 
-/** Runs the reference answer in its own throwaway READ ONLY transaction,
- *  always rolled back — kept completely separate from the submission's
- *  transaction so a submission's side effects (now possible, see below)
- *  can never contaminate what the reference query sees. */
 async function runReference(client: PoolClient, referenceSql: string): Promise<QueryOutput> {
   await client.query('BEGIN READ ONLY');
   await client.query(`SET LOCAL statement_timeout = '${STATEMENT_TIMEOUT_MS}ms'`);
@@ -173,16 +160,6 @@ async function runReference(client: PoolClient, referenceSql: string): Promise<Q
   }
 }
 
-/** Runs every top-level statement in the submission, in order, inside ONE
- *  transaction that is always rolled back — so CREATE FUNCTION, a DO block,
- *  or even an UPDATE can really execute (letting procedures/loops actually
- *  run), while guaranteeing nothing is ever persisted and nothing leaks
- *  into anyone else's attempt. This transaction is deliberately NOT read-only
- *  (unlike the reference phase) — that relaxation is what makes
- *  procedures/functions/loops work at all. Safety instead comes from:
- *  always-rollback, a grading role with zero access to the app's own tables,
- *  CREATE privilege scoped to the throwaway `playground` schema only, and
- *  the statement timeout below (which still applies inside loops/DO blocks). */
 async function runSubmission(client: PoolClient, statements: string[]): Promise<{ result: QueryOutput | null }> {
   await client.query('BEGIN');
   await client.query(`SET LOCAL statement_timeout = '${STATEMENT_TIMEOUT_MS}ms'`);
@@ -288,6 +265,55 @@ export async function runSqlGraded(referenceSql: string, submittedSql: string): 
     };
   } catch (err: any) {
     return emptyResult(start, err.code === '57014' ? 'TIME_LIMIT_EXCEEDED' : 'RUNTIME_ERROR', err.message);
+  } finally {
+    client.release();
+  }
+}
+
+/** Admin-only: runs an arbitrary script against the playground DB and returns
+ *  its final result set, with no reference comparison. Shares the exact same
+ *  always-rollback execution path (`runSubmission`) as real student grading —
+ *  so "testing" a reference answer here carries the same safety guarantees
+ *  as any student submission. Used by the Challenges Manager's "Test Query"
+ *  button so an admin can verify a reference answer actually works and
+ *  returns sane rows before saving it. */
+export async function testSqlQuery(sql: string): Promise<{
+  ok: boolean;
+  columns: string[];
+  rows: unknown[][];
+  message: string;
+  runtimeMs: number;
+}> {
+  const start = Date.now();
+  const statements = splitStatements(sql);
+  if (statements.length === 0) {
+    return { ok: false, columns: [], rows: [], message: 'Write a query first.', runtimeMs: Date.now() - start };
+  }
+
+  const acquired = await graderPool.connect().catch((e: Error) => e);
+  if (acquired instanceof Error) {
+    return { ok: false, columns: [], rows: [], message: `Could not connect: ${acquired.message}`, runtimeMs: Date.now() - start };
+  }
+  const client = acquired;
+
+  try {
+    const { result } = await runSubmission(client, statements);
+    if (result) {
+      return {
+        ok: true,
+        columns: result.columns,
+        rows: result.rows.slice(0, DISPLAY_LIMIT),
+        message: `${result.rows.length} row(s) returned.`,
+        runtimeMs: Date.now() - start,
+      };
+    }
+    return { ok: true, columns: [], rows: [], message: 'Statement(s) executed successfully (no rows returned).', runtimeMs: Date.now() - start };
+  } catch (err: any) {
+    return {
+      ok: false, columns: [], rows: [],
+      message: err.code === '57014' ? 'Query took too long to execute.' : err.message,
+      runtimeMs: Date.now() - start,
+    };
   } finally {
     client.release();
   }
