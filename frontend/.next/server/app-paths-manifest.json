@@ -1,8 +1,5 @@
 {
   "/page": "app/page.js",
-  "/(auth)/forgot-password/page": "app/(auth)/forgot-password/page.js",
-  "/(auth)/reset-password/page": "app/(auth)/reset-password/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(main)/dashboard/page": "app/(main)/dashboard/page.js",
-  "/admin/page": "app/admin/page.js"
+  "/(auth)/forgot-password/page": "app/(auth)/forgot-password/page.js"
 }

@@ -1,5 +1,6 @@
 import { mailer, EMAIL_FROM } from '../config/mailer';
-
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
 function buildResetPasswordEmailHtml(username: string, resetUrl: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
