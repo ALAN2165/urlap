@@ -40,3 +40,16 @@ export async function adminSetUserBan(req: AuthRequest, res: Response, next: Nex
     res.json(user);
   } catch (err) { next(err); }
 }
+export async function getHealth(req: AuthRequest, res: Response) {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+}
+
+export async function getOverview(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const totalUsers = await prisma.user.count();
+    // لو عندك models تانية زي الـ challenges أو الـ submissions ممكن تزودهم هنا بعدين
+    res.json({ totalUsers });
+  } catch (err) { 
+    next(err); 
+  }
+}
