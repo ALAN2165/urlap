@@ -11,6 +11,8 @@
     "logout": "Logout"
   },
   "auth": {
+    "signingIn": "Signing in…",
+"creatingAccount": "Creating account…",
     "loginTitle": "Welcome back",
     "registerTitle": "Create your account",
     "email": "Email",

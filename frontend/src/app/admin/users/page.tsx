@@ -55,7 +55,7 @@ export default function AdminUsersPage() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by username or email…"
+          placeholder="Search by username…"
           className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-11 pr-4 text-sm text-slate-900 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-purple-500 dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-white rtl:pl-4 rtl:pr-11"
         />
       </div>
@@ -85,7 +85,7 @@ export default function AdminUsersPage() {
                     )}
                     {u.isBanned && <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold text-red-600 dark:text-red-400">Banned</span>}
                   </div>
-                  <div className="truncate text-xs text-slate-500 dark:text-slate-400">{u.email}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Joined {new Date(u.createdAt).toLocaleDateString()}</div>
                 </div>
               </div>
 

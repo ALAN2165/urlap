@@ -1,5 +1,6 @@
 import type { PoolClient, QueryResult } from 'pg';
 import { graderPool } from '../config/sqlGraderPool';
+import { friendlyPgError } from '../utils/friendlyError';
 
 const FETCH_LIMIT = 1000;
 const DISPLAY_LIMIT = 100;
@@ -101,18 +102,6 @@ function splitStatements(sql: string): string[] {
   return statements.map((s) => s.trim()).filter(Boolean);
 }
 
-/**
- * Lightweight, literal-aware rewrite for Oracle-style syntax that has no
- * bare-keyword Postgres equivalent. Currently only rewrites a bare `SYSDATE`
- * (not followed by '(') to `CURRENT_DATE`, since Oracle's SYSDATE is used
- * without parentheses. Everything else (NVL, NVL2, DECODE, ADD_MONTHS,
- * MONTHS_BETWEEN, TRUNC, INSTR) is handled by real functions installed in
- * the `playground` schema — see setupSqlPlayground.ts — not by text
- * rewriting, since those need real argument evaluation. Applied to both
- * the submitted query and the reference answer, so either can use this
- * syntax. Skips string/quoted literals, $-quoted blocks, and comments
- * using the same scanning approach as splitStatements.
- */
 function applyCompatibilityRewrites(sql: string): string {
   let out = '';
   let i = 0;
@@ -185,16 +174,6 @@ function applyCompatibilityRewrites(sql: string): string {
   }
 
   return out;
-}
-
-/** Turns a raw pg error into a specific, actionable message instead of a
- *  bare "Runtime error" — includes Postgres's own hint/detail fields when
- *  present (e.g. the exact reason a function call didn't match an overload). */
-function formatPgError(err: any): string {
-  let msg = err.message || 'An unexpected database error occurred.';
-  if (err.hint) msg += `\nHint: ${err.hint}`;
-  if (err.detail) msg += `\nDetail: ${err.detail}`;
-  return msg;
 }
 
 function stripLeadingCommentsAndWhitespace(sql: string): string {
@@ -307,7 +286,7 @@ export async function runSqlGraded(referenceSql: string, submittedSql: string): 
     } catch (dbErr: any) {
       return dbErr.code === '57014'
         ? emptyResult(start, 'TIME_LIMIT_EXCEEDED', 'Your query took too long to execute.')
-        : emptyResult(start, 'RUNTIME_ERROR', formatPgError(dbErr));
+        : emptyResult(start, 'RUNTIME_ERROR', friendlyPgError(dbErr));
     }
 
     const referenceReturnsRows = isRowReturning(rewrittenReference);
@@ -356,14 +335,12 @@ export async function runSqlGraded(referenceSql: string, submittedSql: string): 
       failureReason,
     };
   } catch (err: any) {
-    return emptyResult(start, err.code === '57014' ? 'TIME_LIMIT_EXCEEDED' : 'RUNTIME_ERROR', formatPgError(err));
+    return emptyResult(start, err.code === '57014' ? 'TIME_LIMIT_EXCEEDED' : 'RUNTIME_ERROR', friendlyPgError(err));
   } finally {
     client.release();
   }
 }
 
-/** Used by both the Admin "Test Query" tester and the public SQL Playground.
- *  Shares the exact same always-rollback execution path as real grading. */
 export async function testSqlQuery(sql: string): Promise<{
   ok: boolean;
   columns: string[];
@@ -399,7 +376,7 @@ export async function testSqlQuery(sql: string): Promise<{
   } catch (err: any) {
     return {
       ok: false, columns: [], rows: [],
-      message: err.code === '57014' ? 'Query took too long to execute.' : formatPgError(err),
+      message: err.code === '57014' ? 'Query took too long to execute.' : friendlyPgError(err),
       runtimeMs: Date.now() - start,
     };
   } finally {

@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { prisma } from '../config/db';
 import { sendPasswordResetEmail } from './email.service';
 
-const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+const TOKEN_TTL_MS = 60 * 60 * 1000;
 
 function hashToken(raw: string): string {
   return crypto.createHash('sha256').update(raw).digest('hex');
@@ -10,24 +10,35 @@ function hashToken(raw: string): string {
 
 export async function requestPasswordReset(email: string): Promise<void> {
   const user = await prisma.user.findUnique({ where: { email } });
-  // Deliberately a no-op (not an error) if the email doesn't exist — the
-  // controller always returns the same response either way, so this
-  // endpoint can never be used to find out which emails are registered.
   if (!user) return;
 
-  // Invalidate any earlier unused tokens so only the most recent link works.
-  await prisma.passwordResetToken.deleteMany({ where: { userId: user.id, used: false } });
+  try {
+    await prisma.passwordResetToken.deleteMany({ where: { userId: user.id, used: false } });
 
-  const rawToken = crypto.randomBytes(32).toString('hex');
-  const tokenHash = hashToken(rawToken);
-  const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = hashToken(rawToken);
+    const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
 
-  await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash, expiresAt } });
+    await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash, expiresAt } });
 
-  const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').split(',')[0].trim();
-  const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
+    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').split(',')[0].trim();
+    const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
 
-  await sendPasswordResetEmail(user.email, user.username, resetUrl);
+    console.log(`[password-reset] Generated reset link for ${user.email} using FRONTEND_URL="${frontendUrl}"`);
+
+    await sendPasswordResetEmail(user.email, user.username, resetUrl);
+  } catch (err: any) {
+    // Logged loudly on purpose: this is exactly where a silent production
+    // failure happens — e.g. the password_reset_tokens table missing
+    // because `prisma migrate deploy` was never run against this database,
+    // or FRONTEND_URL pointing at a stale/wrong origin. Never rethrown —
+    // the controller must always return the same generic response either way.
+    console.error('[password-reset] Failed to generate/send a reset link:', {
+      email: user.email,
+      message: err.message,
+      code: err.code,
+    });
+  }
 }
 
 export async function resetPasswordWithToken(rawToken: string, newPasswordHash: string): Promise<{ ok: boolean; error?: string }> {

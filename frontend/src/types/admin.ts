@@ -31,7 +31,6 @@ export interface SqlTestResult { ok: boolean; columns: string[]; rows: unknown[]
 export interface AdminUser {
   id: string;
   username: string;
-  email: string;
   totalPoints: number;
   role: 'STUDENT' | 'ADMIN';
   isBanned: boolean;

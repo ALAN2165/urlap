@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { Lab } from '@/types';
+import QueryLoader from '@/components/shared/QueryLoader';
 
 const containerStagger = { animate: { transition: { staggerChildren: 0.08 } } };
 const fadeUp = { initial: { opacity: 0, y: 30 }, animate: { opacity: 1, y: 0, transition: { duration: 0.5 } } };
@@ -22,7 +23,7 @@ export default function LabsPage() {
       </motion.h1>
       <p className="text-slate-500 dark:text-white/50 mb-8">Work through each lab in order — challenges unlock as you solve them.</p>
 
-      {isLoading && <p className="text-slate-400 dark:text-white/40">Loading…</p>}
+      {isLoading && <QueryLoader />}
 
       {labs && (
         <motion.div variants={containerStagger} initial="initial" animate="animate" className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -41,7 +42,7 @@ export default function LabsPage() {
                     <>
                       <p className="text-sm text-slate-500 dark:text-white/50 mb-3">{lab.solvedChallenges} / {lab.totalChallenges} solved</p>
                       <div className="h-2 rounded-full bg-slate-200 dark:bg-white/[0.06] overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-teal-400 to-purple-500 rounded-full" style={{ width: `${pct}%` }} />
+                        <div className="h-full bg-gradient-to-r from-purple-500 to-purple-700 rounded-full" style={{ width: `${pct}%` }} />
                       </div>
                     </>
                   )}

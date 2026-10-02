@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
-import { Mail, Lock, ArrowRight } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import LogoOrb from '@/components/shared/LogoOrb';
 
 const schema = z.object({ email: z.string().email(), password: z.string().min(1) });
@@ -43,8 +43,8 @@ export default function LoginForm() {
           <label className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{t('email')}</label>
           <div className="relative mt-2">
             <Mail size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 rtl:left-auto rtl:right-4" />
-            <input {...register('email')} type="email"
-              className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 focus:ring-2 focus:ring-purple-500 focus:border-transparent focus:outline-none transition text-slate-900 dark:text-white placeholder:text-slate-400 rtl:pl-4 rtl:pr-12" />
+            <input {...register('email')} type="email" disabled={isSubmitting}
+              className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 focus:ring-2 focus:ring-purple-500 focus:border-transparent focus:outline-none transition text-slate-900 dark:text-white placeholder:text-slate-400 rtl:pl-4 rtl:pr-12 disabled:opacity-60" />
           </div>
           {errors.email && <p className="text-red-500 text-xs mt-1.5">{errors.email.message}</p>}
         </motion.div>
@@ -58,8 +58,8 @@ export default function LoginForm() {
           </div>
           <div className="relative mt-2">
             <Lock size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 rtl:left-auto rtl:right-4" />
-            <input {...register('password')} type="password"
-              className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 focus:ring-2 focus:ring-purple-500 focus:border-transparent focus:outline-none transition text-slate-900 dark:text-white placeholder:text-slate-400 rtl:pl-4 rtl:pr-12" />
+            <input {...register('password')} type="password" disabled={isSubmitting}
+              className="w-full pl-12 pr-4 py-3.5 rounded-xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 focus:ring-2 focus:ring-purple-500 focus:border-transparent focus:outline-none transition text-slate-900 dark:text-white placeholder:text-slate-400 rtl:pl-4 rtl:pr-12 disabled:opacity-60" />
           </div>
           {errors.password && <p className="text-red-500 text-xs mt-1.5">{errors.password.message}</p>}
         </motion.div>
@@ -68,12 +68,21 @@ export default function LoginForm() {
 
         <motion.button
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }}
-          whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.97 }}
+          whileHover={{ scale: isSubmitting ? 1 : 1.02, y: isSubmitting ? 0 : -2 }} whileTap={{ scale: isSubmitting ? 1 : 0.97 }}
           type="submit" disabled={isSubmitting}
-          className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 to-purple-800 shadow-[0_10px_30px_rgba(147,51,234,0.3)] hover:shadow-[0_10px_40px_rgba(147,51,234,0.5)] transition-shadow disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 to-purple-800 shadow-[0_10px_30px_rgba(147,51,234,0.3)] hover:shadow-[0_10px_40px_rgba(147,51,234,0.5)] transition-shadow disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {t('signIn')}
-          <ArrowRight size={18} className="rtl:rotate-180" />
+          {isSubmitting ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              {t('signingIn')}
+            </>
+          ) : (
+            <>
+              {t('signIn')}
+              <ArrowRight size={18} className="rtl:rotate-180" />
+            </>
+          )}
         </motion.button>
       </form>
 

@@ -11,6 +11,8 @@
     "playground": "ساحة التجربة"
   },
   "auth": {
+    "signingIn": "جارٍ تسجيل الدخول…",
+"creatingAccount": "جارٍ إنشاء الحساب…",
     "loginTitle": "مرحبًا بعودتك",
     "registerTitle": "أنشئ حسابك",
     "email": "البريد الإلكتروني",
