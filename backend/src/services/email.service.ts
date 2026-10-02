@@ -129,17 +129,34 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 }
 
-export async function sendPasswordResetEmail(to: string, username: string, resetUrl: string): Promise<void> {
+eexport async function sendPasswordResetEmail(to: string, username: string, resetUrl: string): Promise<void> {
   if (!mailer) {
     console.log(`\n📧 [password reset — no SMTP configured] Link for ${to}:\n${resetUrl}\n`);
     return;
   }
 
-  await mailer.sendMail({
-    from: EMAIL_FROM,
-    to,
-    subject: 'Reset your urlap password',
-    html: buildResetPasswordEmailHtml(username, resetUrl),
-    text: buildResetPasswordEmailText(username, resetUrl),
-  });
+  try {
+    const info = await mailer.sendMail({
+      from: EMAIL_FROM,
+      to,
+      subject: 'Reset your urlap password',
+      html: buildResetPasswordEmailHtml(username, resetUrl),
+      text: buildResetPasswordEmailText(username, resetUrl),
+    });
+    console.log(`[mailer] Password reset email sent to ${to} — messageId: ${info.messageId}`);
+  } catch (err: any) {
+    // Logged loudly but NOT rethrown: the reset token is already created,
+    // and the controller always returns the same generic response whether
+    // or not the email actually went out, so a send failure here must
+    // never 500 the request. This is exactly the failure this logging
+    // exists to surface in Railway's logs.
+    console.error('[mailer] Failed to send password reset email:', {
+      to,
+      message: err.message,
+      code: err.code,
+      command: err.command,
+      response: err.response,
+      responseCode: err.responseCode,
+    });
+  }
 }

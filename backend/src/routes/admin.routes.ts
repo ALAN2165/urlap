@@ -7,6 +7,10 @@ import {
   adminGetChallenge, adminCreateChallenge, adminUpdateChallenge, adminDeleteChallenge, adminReorderChallenges,
 } from '../controllers/adminChallenges.controller';
 import { adminTestSql } from '../controllers/adminSql.controller';
+import { adminGetUsers, adminSetUserRole, adminSetUserBan } from '../controllers/adminUsers.controller';
+import {
+  adminGetAnnouncements, adminCreateAnnouncement, adminUpdateAnnouncement, adminDeleteAnnouncement,
+} from '../controllers/adminAnnouncements.controller';
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -25,5 +29,14 @@ router.put('/challenges/:id', adminUpdateChallenge);
 router.delete('/challenges/:id', adminDeleteChallenge);
 
 router.post('/sql-test', adminTestSql);
+
+router.get('/users', adminGetUsers);
+router.put('/users/:id/role', adminSetUserRole);
+router.put('/users/:id/ban', adminSetUserBan);
+
+router.get('/announcements', adminGetAnnouncements);
+router.post('/announcements', adminCreateAnnouncement);
+router.put('/announcements/:id', adminUpdateAnnouncement);
+router.delete('/announcements/:id', adminDeleteAnnouncement);
 
 export default router;

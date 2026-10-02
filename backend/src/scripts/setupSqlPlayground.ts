@@ -51,22 +51,59 @@ async function main() {
     console.warn('  (non-fatal) could not grant plpgsql usage:', (err as Error).message);
   }
 
-  console.log('🧩 Installing Oracle-compatibility helper functions (NVL, NVL2)...');
+  console.log('🧩 Installing SQL compatibility helper functions (NVL, NVL2, DECODE, date/string helpers)...');
 
+  // Drop the old generic/polymorphic versions from earlier — they're the
+  // actual root cause of "NVL fails with a literal argument". Concrete
+  // per-type overloads below replace them.
+  await admin.query(`DROP FUNCTION IF EXISTS playground.nvl(anyelement, anyelement);`);
+  await admin.query(`DROP FUNCTION IF EXISTS playground.nvl2(anyelement, anyelement, anyelement);`);
+
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl(text, text) RETURNS text AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE;`);
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl(integer, integer) RETURNS integer AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE;`);
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl(bigint, bigint) RETURNS bigint AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE;`);
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl(numeric, numeric) RETURNS numeric AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE;`);
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl(date, date) RETURNS date AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE;`);
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl(timestamp, timestamp) RETURNS timestamp AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE;`);
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl(boolean, boolean) RETURNS boolean AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE;`);
+
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl2(anyelement, text, text) RETURNS text AS $$ SELECT CASE WHEN $1 IS NOT NULL THEN $2 ELSE $3 END; $$ LANGUAGE sql IMMUTABLE;`);
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl2(anyelement, integer, integer) RETURNS integer AS $$ SELECT CASE WHEN $1 IS NOT NULL THEN $2 ELSE $3 END; $$ LANGUAGE sql IMMUTABLE;`);
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl2(anyelement, numeric, numeric) RETURNS numeric AS $$ SELECT CASE WHEN $1 IS NOT NULL THEN $2 ELSE $3 END; $$ LANGUAGE sql IMMUTABLE;`);
+
+  // DECODE(expr, search1, result1, [search2, result2, ...], [default]).
+  // Caveat: all arguments must share one common type (a Postgres array
+  // constraint) — covers the common case (e.g. all-text comparisons/results)
+  // but not Oracle's more permissive implicit mixed-type coercion.
   await admin.query(`
-    CREATE OR REPLACE FUNCTION playground.nvl(anyelement, anyelement)
+    CREATE OR REPLACE FUNCTION playground.decode(VARIADIC args anyarray)
     RETURNS anyelement AS $$
-      SELECT COALESCE($1, $2);
-    $$ LANGUAGE sql IMMUTABLE;
+    DECLARE
+      i integer := 2;
+      n integer := array_length(args, 1);
+    BEGIN
+      WHILE i < n LOOP
+        IF args[1] IS NOT DISTINCT FROM args[i] THEN
+          RETURN args[i + 1];
+        END IF;
+        i := i + 2;
+      END LOOP;
+      IF i = n THEN
+        RETURN args[n];
+      END IF;
+      RETURN NULL;
+    END;
+    $$ LANGUAGE plpgsql IMMUTABLE;
   `);
-  await admin.query(`
-    CREATE OR REPLACE FUNCTION playground.nvl2(anyelement, anyelement, anyelement)
-    RETURNS anyelement AS $$
-      SELECT CASE WHEN $1 IS NOT NULL THEN $2 ELSE $3 END;
-    $$ LANGUAGE sql IMMUTABLE;
-  `);
-  await admin.query(`GRANT EXECUTE ON FUNCTION playground.nvl(anyelement, anyelement) TO urlap_grader;`);
-  await admin.query(`GRANT EXECUTE ON FUNCTION playground.nvl2(anyelement, anyelement, anyelement) TO urlap_grader;`);
+
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.add_months(date, integer) RETURNS date AS $$ SELECT ($1 + ($2 || ' months')::interval)::date; $$ LANGUAGE sql IMMUTABLE;`);
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.months_between(date, date) RETURNS numeric AS $$ SELECT (EXTRACT(YEAR FROM age($1, $2)) * 12 + EXTRACT(MONTH FROM age($1, $2)))::numeric; $$ LANGUAGE sql IMMUTABLE;`);
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.trunc(timestamp) RETURNS date AS $$ SELECT $1::date; $$ LANGUAGE sql IMMUTABLE;`);
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.instr(text, text) RETURNS integer AS $$ SELECT POSITION($2 IN $1); $$ LANGUAGE sql IMMUTABLE;`);
+  await admin.query(`CREATE OR REPLACE FUNCTION playground.instr(text, text, integer) RETURNS integer AS $$ SELECT CASE WHEN POSITION($2 IN SUBSTRING($1 FROM $3)) = 0 THEN 0 ELSE POSITION($2 IN SUBSTRING($1 FROM $3)) + $3 - 1 END; $$ LANGUAGE sql IMMUTABLE;`);
+
+  await admin.query(`GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA playground TO urlap_grader;`);
+  await admin.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA playground GRANT EXECUTE ON FUNCTIONS TO urlap_grader;`);
 
   console.log('🌱 Inserting dummy employee rows...');
 

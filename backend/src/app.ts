@@ -8,6 +8,7 @@ import submissionRoutes from './routes/submission.routes';
 import leaderboardRoutes from './routes/leaderboard.routes';
 import announcementRoutes from './routes/announcement.routes';
 import adminRoutes from './routes/admin.routes';
+import playgroundRoutes from './routes/playground.routes';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -24,6 +25,7 @@ const corsOptions: cors.CorsOptions = {
 
 app.use(helmet());
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(morgan('dev'));
 app.use(express.json());
 
@@ -33,6 +35,7 @@ app.use('/api/submissions', submissionRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/playground', playgroundRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 

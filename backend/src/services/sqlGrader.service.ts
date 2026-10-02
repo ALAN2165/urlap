@@ -46,7 +46,6 @@ function splitStatements(sql: string): string[] {
       i = stop;
       continue;
     }
-
     if (ch === '/' && sql[i + 1] === '*') {
       const end = sql.indexOf('*/', i + 2);
       const stop = end === -1 ? n : end + 2;
@@ -54,7 +53,6 @@ function splitStatements(sql: string): string[] {
       i = stop;
       continue;
     }
-
     if (ch === "'") {
       let j = i + 1;
       while (j < n) {
@@ -66,7 +64,6 @@ function splitStatements(sql: string): string[] {
       i = j;
       continue;
     }
-
     if (ch === '"') {
       let j = i + 1;
       while (j < n) {
@@ -78,7 +75,6 @@ function splitStatements(sql: string): string[] {
       i = j;
       continue;
     }
-
     if (ch === '$') {
       const tagMatch = /^\$([A-Za-z0-9_]*)\$/.exec(sql.slice(i));
       if (tagMatch) {
@@ -90,7 +86,6 @@ function splitStatements(sql: string): string[] {
         continue;
       }
     }
-
     if (ch === ';') {
       statements.push(current);
       current = '';
@@ -104,6 +99,102 @@ function splitStatements(sql: string): string[] {
 
   if (current.trim().length > 0) statements.push(current);
   return statements.map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Lightweight, literal-aware rewrite for Oracle-style syntax that has no
+ * bare-keyword Postgres equivalent. Currently only rewrites a bare `SYSDATE`
+ * (not followed by '(') to `CURRENT_DATE`, since Oracle's SYSDATE is used
+ * without parentheses. Everything else (NVL, NVL2, DECODE, ADD_MONTHS,
+ * MONTHS_BETWEEN, TRUNC, INSTR) is handled by real functions installed in
+ * the `playground` schema — see setupSqlPlayground.ts — not by text
+ * rewriting, since those need real argument evaluation. Applied to both
+ * the submitted query and the reference answer, so either can use this
+ * syntax. Skips string/quoted literals, $-quoted blocks, and comments
+ * using the same scanning approach as splitStatements.
+ */
+function applyCompatibilityRewrites(sql: string): string {
+  let out = '';
+  let i = 0;
+  const n = sql.length;
+
+  while (i < n) {
+    const ch = sql[i];
+
+    if (ch === '-' && sql[i + 1] === '-') {
+      const nl = sql.indexOf('\n', i);
+      const stop = nl === -1 ? n : nl;
+      out += sql.slice(i, stop);
+      i = stop;
+      continue;
+    }
+    if (ch === '/' && sql[i + 1] === '*') {
+      const end = sql.indexOf('*/', i + 2);
+      const stop = end === -1 ? n : end + 2;
+      out += sql.slice(i, stop);
+      i = stop;
+      continue;
+    }
+    if (ch === "'") {
+      let j = i + 1;
+      while (j < n) {
+        if (sql[j] === "'" && sql[j + 1] === "'") { j += 2; continue; }
+        if (sql[j] === "'") { j += 1; break; }
+        j += 1;
+      }
+      out += sql.slice(i, j);
+      i = j;
+      continue;
+    }
+    if (ch === '"') {
+      let j = i + 1;
+      while (j < n) {
+        if (sql[j] === '"' && sql[j + 1] === '"') { j += 2; continue; }
+        if (sql[j] === '"') { j += 1; break; }
+        j += 1;
+      }
+      out += sql.slice(i, j);
+      i = j;
+      continue;
+    }
+    if (ch === '$') {
+      const tagMatch = /^\$([A-Za-z0-9_]*)\$/.exec(sql.slice(i));
+      if (tagMatch) {
+        const tag = tagMatch[0];
+        const closeIdx = sql.indexOf(tag, i + tag.length);
+        const stop = closeIdx === -1 ? n : closeIdx + tag.length;
+        out += sql.slice(i, stop);
+        i = stop;
+        continue;
+      }
+    }
+
+    const rest = sql.slice(i);
+    const match = /^SYSDATE\b/i.exec(rest);
+    if (match) {
+      const after = sql[i + match[0].length];
+      if (after !== '(') {
+        out += 'CURRENT_DATE';
+        i += match[0].length;
+        continue;
+      }
+    }
+
+    out += ch;
+    i += 1;
+  }
+
+  return out;
+}
+
+/** Turns a raw pg error into a specific, actionable message instead of a
+ *  bare "Runtime error" — includes Postgres's own hint/detail fields when
+ *  present (e.g. the exact reason a function call didn't match an overload). */
+function formatPgError(err: any): string {
+  let msg = err.message || 'An unexpected database error occurred.';
+  if (err.hint) msg += `\nHint: ${err.hint}`;
+  if (err.detail) msg += `\nDetail: ${err.detail}`;
+  return msg;
 }
 
 function stripLeadingCommentsAndWhitespace(sql: string): string {
@@ -149,9 +240,7 @@ async function runReference(client: PoolClient, referenceSql: string): Promise<Q
   await client.query('BEGIN READ ONLY');
   await client.query(`SET LOCAL statement_timeout = '${STATEMENT_TIMEOUT_MS}ms'`);
   try {
-    const result = isRowReturning(referenceSql)
-      ? await runCursor(client, referenceSql)
-      : { columns: [], rows: [] };
+    const result = isRowReturning(referenceSql) ? await runCursor(client, referenceSql) : { columns: [], rows: [] };
     await client.query('ROLLBACK');
     return result;
   } catch (err) {
@@ -189,7 +278,10 @@ async function runSubmission(client: PoolClient, statements: string[]): Promise<
 export async function runSqlGraded(referenceSql: string, submittedSql: string): Promise<GradeResult> {
   const start = Date.now();
 
-  const statements = splitStatements(submittedSql);
+  const rewrittenSubmitted = applyCompatibilityRewrites(submittedSql);
+  const rewrittenReference = applyCompatibilityRewrites(referenceSql);
+
+  const statements = splitStatements(rewrittenSubmitted);
   if (statements.length === 0) {
     return emptyResult(start, 'RUNTIME_ERROR', 'Write a query first.');
   }
@@ -203,7 +295,7 @@ export async function runSqlGraded(referenceSql: string, submittedSql: string): 
   try {
     let ref: QueryOutput;
     try {
-      ref = await runReference(client, referenceSql);
+      ref = await runReference(client, rewrittenReference);
     } catch (refErr) {
       console.error('Reference SQL failed to run:', refErr);
       return emptyResult(start, 'RUNTIME_ERROR', 'The reference solution for this challenge failed to run. Please report it.');
@@ -215,10 +307,10 @@ export async function runSqlGraded(referenceSql: string, submittedSql: string): 
     } catch (dbErr: any) {
       return dbErr.code === '57014'
         ? emptyResult(start, 'TIME_LIMIT_EXCEEDED', 'Your query took too long to execute.')
-        : emptyResult(start, 'RUNTIME_ERROR', dbErr.message);
+        : emptyResult(start, 'RUNTIME_ERROR', formatPgError(dbErr));
     }
 
-    const referenceReturnsRows = isRowReturning(referenceSql);
+    const referenceReturnsRows = isRowReturning(rewrittenReference);
 
     if (!submitted.result) {
       if (!referenceReturnsRows) {
@@ -240,7 +332,7 @@ export async function runSqlGraded(referenceSql: string, submittedSql: string): 
     const sameColumns = JSON.stringify(submitted.result.columns) === JSON.stringify(ref.columns);
     const subKeys = submitted.result.rows.map(rowKey);
     const refKeys = ref.rows.map(rowKey);
-    const orderMatters = /\border\s+by\b/i.test(referenceSql);
+    const orderMatters = /\border\s+by\b/i.test(rewrittenReference);
     const sameRows = orderMatters
       ? JSON.stringify(subKeys) === JSON.stringify(refKeys)
       : JSON.stringify([...subKeys].sort()) === JSON.stringify([...refKeys].sort());
@@ -264,19 +356,14 @@ export async function runSqlGraded(referenceSql: string, submittedSql: string): 
       failureReason,
     };
   } catch (err: any) {
-    return emptyResult(start, err.code === '57014' ? 'TIME_LIMIT_EXCEEDED' : 'RUNTIME_ERROR', err.message);
+    return emptyResult(start, err.code === '57014' ? 'TIME_LIMIT_EXCEEDED' : 'RUNTIME_ERROR', formatPgError(err));
   } finally {
     client.release();
   }
 }
 
-/** Admin-only: runs an arbitrary script against the playground DB and returns
- *  its final result set, with no reference comparison. Shares the exact same
- *  always-rollback execution path (`runSubmission`) as real student grading —
- *  so "testing" a reference answer here carries the same safety guarantees
- *  as any student submission. Used by the Challenges Manager's "Test Query"
- *  button so an admin can verify a reference answer actually works and
- *  returns sane rows before saving it. */
+/** Used by both the Admin "Test Query" tester and the public SQL Playground.
+ *  Shares the exact same always-rollback execution path as real grading. */
 export async function testSqlQuery(sql: string): Promise<{
   ok: boolean;
   columns: string[];
@@ -285,7 +372,8 @@ export async function testSqlQuery(sql: string): Promise<{
   runtimeMs: number;
 }> {
   const start = Date.now();
-  const statements = splitStatements(sql);
+  const rewritten = applyCompatibilityRewrites(sql);
+  const statements = splitStatements(rewritten);
   if (statements.length === 0) {
     return { ok: false, columns: [], rows: [], message: 'Write a query first.', runtimeMs: Date.now() - start };
   }
@@ -311,7 +399,7 @@ export async function testSqlQuery(sql: string): Promise<{
   } catch (err: any) {
     return {
       ok: false, columns: [], rows: [],
-      message: err.code === '57014' ? 'Query took too long to execute.' : err.message,
+      message: err.code === '57014' ? 'Query took too long to execute.' : formatPgError(err),
       runtimeMs: Date.now() - start,
     };
   } finally {
