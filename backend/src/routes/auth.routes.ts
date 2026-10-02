@@ -3,6 +3,7 @@ import { register, login, me, stats, updateProfile } from '../controllers/auth.c
 import { uploadAvatarHandler } from '../controllers/avatar.controller';
 import { uploadAvatar } from '../middleware/uploadAvatar';
 import { requireAuth } from '../middleware/authMiddleware';
+import { forgotPassword, resetPassword } from '../controllers/passwordReset.controller';
 
 const router = Router();
 router.post('/register', register);
@@ -11,5 +12,7 @@ router.get('/me', requireAuth, me);
 router.get('/stats', requireAuth, stats);
 router.put('/profile', requireAuth, updateProfile);
 router.post('/avatar', requireAuth, uploadAvatar, uploadAvatarHandler);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 export default router;
