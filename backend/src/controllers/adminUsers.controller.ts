@@ -26,7 +26,7 @@ export async function adminSetUserRole(req: AuthRequest, res: Response, next: Ne
   try {
     if (req.params.id === req.userId) return res.status(400).json({ error: 'You cannot change your own role.' });
     const { role } = roleSchema.parse(req.body);
-    const user = await prisma.user.update({ where: { id: req.params.id }, data: { role }, select: { id: true, username: true, role: true } });
+    const user = await prisma.user.update({ where: { id: req.params.id as string}, data: { role }, select: { id: true, username: true, role: true } });
     res.json(user);
   } catch (err) { next(err); }
 }
@@ -36,7 +36,7 @@ export async function adminSetUserBan(req: AuthRequest, res: Response, next: Nex
   try {
     if (req.params.id === req.userId) return res.status(400).json({ error: 'You cannot ban your own account.' });
     const { isBanned } = banSchema.parse(req.body);
-    const user = await prisma.user.update({ where: { id: req.params.id }, data: { isBanned }, select: { id: true, username: true, isBanned: true } });
+    const user = await prisma.user.update({ where: { id: req.params.id as string}, data: { isBanned }, select: { id: true, username: true, isBanned: true } });
     res.json(user);
   } catch (err) { next(err); }
 }
