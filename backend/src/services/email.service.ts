@@ -129,7 +129,7 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
 }
 
-eexport async function sendPasswordResetEmail(to: string, username: string, resetUrl: string): Promise<void> {
+export async function sendPasswordResetEmail(to: string, username: string, resetUrl: string): Promise<void> {
   if (!mailer) {
     console.log(`\n📧 [password reset — no SMTP configured] Link for ${to}:\n${resetUrl}\n`);
     return;
