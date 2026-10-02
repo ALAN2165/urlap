@@ -8,6 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Link from 'next/link';
 import { Mail, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { api } from '@/lib/api';
 import LogoOrb from '@/components/shared/LogoOrb';
 
 const schema = z.object({ email: z.string().email() });
@@ -18,12 +19,15 @@ export default function ForgotPasswordForm() {
   const [sent, setSent] = useState(false);
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({ resolver: zodResolver(schema) });
 
-  async function onSubmit(_data: FormData) {
-    // Placeholder only — no backend endpoint exists yet for password resets.
-    // Simulates a request so the UI feels real; wire this to a real
-    // POST /api/auth/forgot-password (token + email sending) when that's built.
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    setSent(true);
+  async function onSubmit(data: FormData) {
+    try {
+      await api.post('/auth/forgot-password', { email: data.email });
+    } catch {
+      // Ignored on purpose: the backend always returns the same generic
+      // response, so there's nothing distinct to show on failure here.
+    } finally {
+      setSent(true);
+    }
   }
 
   return (

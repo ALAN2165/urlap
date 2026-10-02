@@ -4,6 +4,7 @@
     "dashboard": "Dashboard",
     "leaderboard": "Leaderboard",
     "announcements": "Announcements",
+    "playground": "Playground",
     "profile": "Profile",
     "login": "Login",
     "register": "Register",
@@ -36,6 +37,19 @@
     "submit": "Send reset link",
     "success": "If an account with that email exists, you'll receive reset instructions shortly.",
     "backToLogin": "Back to login"
+  },
+  "resetPassword": {
+    "title": "Set a new password",
+    "subtitle": "Choose a strong new password for your account.",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "submit": "Reset password",
+    "success": "Password updated!",
+    "successDesc": "Redirecting you to login…",
+    "invalidToken": "Invalid or missing link",
+    "invalidTokenDesc": "This password reset link is invalid or incomplete. Please request a new one.",
+    "requestNewLink": "Request a new link",
+    "genericError": "Could not reset your password. The link may have expired."
   },
   "challenge": {
     "difficulty": "Difficulty",
@@ -147,5 +161,11 @@
     "badgeNewLab": "New Lab",
     "badgeFeature": "New Feature",
     "badgeMaintenance": "Maintenance"
-  }
+  },
+  "playground": {
+  "title": "SQL Playground",
+  "subtitle": "Write and run any SQL against the sample database — no challenge, no pressure.",
+  "run": "Run Query",
+  "running": "Running…"
+}
 }

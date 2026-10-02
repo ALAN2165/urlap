@@ -66,6 +66,7 @@ export default function Navbar() {
           {user && <NavLink href="/dashboard" label={t('dashboard')} />}
           {user && <NavLink href="/leaderboard" label={t('leaderboard')} />}
           {user && <NavLink href="/announcements" label={t('announcements')} />}
+          {user && <NavLink href="/playground" label={t('playground')} />}
           {user && <NavLink href="/profile" label={t('profile')} />}
           {isAdmin && (
             <Link href="/admin" className="ml-1">
@@ -128,6 +129,7 @@ export default function Navbar() {
               {user && <MobileNavLink href="/dashboard" label={t('dashboard')} onClick={() => setMenuOpen(false)} />}
               {user && <MobileNavLink href="/leaderboard" label={t('leaderboard')} onClick={() => setMenuOpen(false)} />}
               {user && <MobileNavLink href="/announcements" label={t('announcements')} onClick={() => setMenuOpen(false)} />}
+              {user && <MobileNavLink href="/playground" label={t('playground')} onClick={() => setMenuOpen(false)} />}
               {user && <MobileNavLink href="/profile" label={t('profile')} onClick={() => setMenuOpen(false)} />}
 
               {isAdmin && (

@@ -18,8 +18,6 @@ export default function AdminTopBar() {
   const pathname = usePathname();
   const title = TITLES[pathname ?? ''] ?? 'Admin';
 
-  // Shares the 'admin-health' query key with the Overview page, so this
-  // never fires a duplicate network request when both are mounted.
   const { data: health } = useQuery<SystemHealth>({
     queryKey: ['admin-health'],
     queryFn: async () => (await api.get('/admin/health')).data,
@@ -29,10 +27,10 @@ export default function AdminTopBar() {
   const allOk = health ? health.database.ok && health.redis.ok && health.sqlGrader.ok : null;
 
   return (
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-3 md:mb-8">
-      <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white sm:text-3xl">{title}</h1>
+    <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between md:mb-8">
+      <h1 className="text-xl font-extrabold text-slate-900 dark:text-white sm:text-2xl md:text-3xl">{title}</h1>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <span
           className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
             allOk === null
