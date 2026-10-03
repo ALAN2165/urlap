@@ -131,6 +131,7 @@
     "solvedOf": "{solved} of {total} solved"
   },
   "profile": {
+  "comingSoon": "Coming Soon",
     "emailAnnouncementsTitle": "Receive platform announcements via email",
   "emailAnnouncementsDesc": "Get an email whenever we publish a new announcement.",
     "title": "Profile",

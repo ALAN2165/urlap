@@ -131,6 +131,7 @@
     "solvedOf": "تم حلّ {solved} من {total}"
   },
   "profile": {
+    "comingSoon": "قريبًا",
      "emailAnnouncementsTitle": "تلقي إعلانات المنصة عبر البريد الإلكتروني",
   "emailAnnouncementsDesc": "احصل على بريد إلكتروني عند نشر إعلان جديد.",
     "title": "الملف الشخصي",

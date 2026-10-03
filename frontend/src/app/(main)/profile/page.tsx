@@ -26,7 +26,6 @@ export default function ProfilePage() {
   const { user, setUser } = useAuthStore();
   const [error, setError] = useState('');
   const [togglingBoard, setTogglingBoard] = useState(false);
-  const [togglingEmails, setTogglingEmails] = useState(false);
 
   const { data: stats } = useQuery<Stats>({
     queryKey: ['stats'],
@@ -78,19 +77,6 @@ export default function ProfilePage() {
       toast.error(err?.response?.data?.error || t('updateFailed'));
     } finally {
       setTogglingBoard(false);
-    }
-  }
-
-  async function onToggleEmails(checked: boolean) {
-    setTogglingEmails(true);
-    try {
-      const { data: updated } = await api.put('/auth/profile', { receiveAnnouncementEmails: checked });
-      setUser(updated);
-      toast.success(t('saved'));
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || t('updateFailed'));
-    } finally {
-      setTogglingEmails(false);
     }
   }
 
@@ -161,12 +147,20 @@ export default function ProfilePage() {
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
-        className="glass flex items-center justify-between gap-4 rounded-3xl p-5 sm:p-6">
+        className="glass flex items-center justify-between gap-4 rounded-3xl p-5 opacity-80 sm:p-6">
         <div>
-          <div className="font-semibold text-slate-900 dark:text-white">{t('emailAnnouncementsTitle')}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-slate-900 dark:text-white">{t('emailAnnouncementsTitle')}</span>
+            <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+              {t('comingSoon')}
+            </span>
+          </div>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{t('emailAnnouncementsDesc')}</p>
         </div>
-        <Switch checked={user.receiveAnnouncementEmails ?? false} onChange={onToggleEmails} disabled={togglingEmails} />
+        <div className="flex flex-shrink-0 items-center gap-2.5">
+          <Lock size={16} className="text-slate-400 dark:text-slate-500" />
+          <Switch checked={false} onChange={() => {}} disabled />
+        </div>
       </motion.div>
     </div>
   );
