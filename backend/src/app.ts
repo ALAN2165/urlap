@@ -14,15 +14,25 @@ import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
+// تنظيف الرابط من أي علامات تنصيص أو مسافات أو شرطة مايلة في الآخر
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+  .replace(/['"]/g, '') // إزالة علامات التنصيص لو اتكتبت بالغلط
   .split(',')
-  .map((s) => s.trim())
+  .map((s) => s.trim().replace(/\/$/, '')) // إزالة الشرطة المايلة من آخر الرابط
   .filter(Boolean);
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-    else callback(new Error('Not allowed by CORS'));
+    // تنظيف الـ origin اللي جاي من البراوزر للمقارنة
+    const cleanOrigin = origin ? origin.replace(/\/$/, '') : '';
+    
+    if (!origin || allowedOrigins.includes(cleanOrigin)) {
+      callback(null, true);
+    } else {
+      // السطر ده هيطبعلك في اللوجز الرابط اللي مرفوض والرابط المسموح بيه عشان تعرف الفرق بعينك
+      console.error(`[CORS Blocked] Origin received: '${origin}' | Allowed list:`, allowedOrigins);
+      callback(new Error('Not allowed by CORS'));
+    }
   },
 };
 
