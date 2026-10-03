@@ -49,23 +49,25 @@ enum Role {
 }
 
 model User {
-  id                String   @id @default(cuid())
-  username          String   @unique
-  email             String   @unique
-  passwordHash      String
-  avatarUrl         String?
-  totalPoints       Int      @default(0)
-  preferredLang     String   @default("en")
-  showInLeaderboard Boolean  @default(true)
-  role              Role     @default(STUDENT)
-  isBanned          Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                        String   @id @default(cuid())
+  username                  String   @unique
+  email                     String   @unique
+  passwordHash              String
+  avatarUrl                 String?
+  totalPoints               Int      @default(0)
+  preferredLang             String   @default("en")
+  showInLeaderboard         Boolean  @default(true)
+  receiveAnnouncementEmails Boolean  @default(false)
+  role                      Role     @default(STUDENT)
+  isBanned                  Boolean  @default(false)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
   submissions      Submission[]
   solvedChallenges ChallengeCompletion[]
   hintUsages       HintUsage[]
   resetTokens      PasswordResetToken[]
+  challengeReports ChallengeReport[]
 
   @@map("users")
 }
@@ -131,6 +133,7 @@ model Challenge {
   hints        Hint[]
   submissions  Submission[]
   completions  ChallengeCompletion[]
+  reports      ChallengeReport[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -231,4 +234,16 @@ model Announcement {
   createdAt DateTime         @default(now())
 
   @@map("announcements")
+}
+
+model ChallengeReport {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  reason      String    @db.Text
+  createdAt   DateTime  @default(now())
+
+  @@map("challenge_reports")
 }

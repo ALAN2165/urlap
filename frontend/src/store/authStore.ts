@@ -7,6 +7,7 @@ interface User {
   totalPoints: number;
   avatarUrl?: string | null;
   showInLeaderboard?: boolean;
+  receiveAnnouncementEmails?: boolean;
   role?: 'STUDENT' | 'ADMIN';
 }
 

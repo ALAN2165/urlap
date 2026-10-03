@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
-import { LayoutDashboard, BookOpen, Users, Megaphone, ArrowLeft, Menu, X } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Users, Megaphone, ArrowLeft, Menu,Flag, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import LogoOrb from '@/components/shared/LogoOrb';
 
@@ -16,6 +16,7 @@ const SECTIONS = [
   {
     label: 'Manage',
     links: [
+      { href: '/admin/reports', label: 'Reports', icon: Flag, exact: false },
       { href: '/admin/challenges', label: 'Challenges', icon: BookOpen, exact: false },
       { href: '/admin/users', label: 'Users', icon: Users, exact: false },
       { href: '/admin/announcements', label: 'Announcements', icon: Megaphone, exact: false },

@@ -9,6 +9,7 @@ import leaderboardRoutes from './routes/leaderboard.routes';
 import announcementRoutes from './routes/announcement.routes';
 import adminRoutes from './routes/admin.routes';
 import playgroundRoutes from './routes/playground.routes';
+import reportRoutes from './routes/report.routes';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -19,8 +20,10 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
   .filter(Boolean);
 
 const corsOptions: cors.CorsOptions = {
-  origin: true, // بيسمح لأي موقع يكلم السيرفر من غير شروط معقدة
-  credentials: true,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+    else callback(new Error('Not allowed by CORS'));
+  },
 };
 
 app.use(helmet());
@@ -35,6 +38,7 @@ app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/playground', playgroundRoutes);
+app.use('/api/reports', reportRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 

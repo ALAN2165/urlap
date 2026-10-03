@@ -54,6 +54,14 @@
     "genericError": "Could not reset your password. The link may have expired."
   },
   "challenge": {
+     "report": "Report",
+  "reportTitle": "Report an issue",
+  "reportSubtitle": "Found something wrong with this challenge? Let us know.",
+  "reportPlaceholder": "What's the issue? e.g. the expected answer looks wrong, a hint is confusing...",
+  "reportSubmit": "Send report",
+  "reportSent": "Report sent — thank you!",
+  "reportFailed": "Could not send your report. Please try again.",
+  "reportTooShort": "Please add a bit more detail (at least 5 characters).",
     "difficulty": "Difficulty",
     "points": "Points",
     "pts": "pts",
@@ -123,6 +131,8 @@
     "solvedOf": "{solved} of {total} solved"
   },
   "profile": {
+    "emailAnnouncementsTitle": "Receive platform announcements via email",
+  "emailAnnouncementsDesc": "Get an email whenever we publish a new announcement.",
     "title": "Profile",
     "subtitle": "Manage your account settings.",
     "displayName": "Display Name",

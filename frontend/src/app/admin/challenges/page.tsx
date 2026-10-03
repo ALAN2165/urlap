@@ -22,10 +22,12 @@ export default function AdminChallengesPage() {
 
   const [activeLabId, setActiveLabId] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ labId: string; challengeId: string | null } | null>(null);
-  const [showNewLab, setShowNewLab] = useState(false);
-  const [newLabEn, setNewLabEn] = useState('');
-  const [newLabAr, setNewLabAr] = useState('');
-  const [creatingLab, setCreatingLab] = useState(false);
+
+  const [formMode, setFormMode] = useState<'closed' | 'new' | 'edit'>('closed');
+  const [formLabId, setFormLabId] = useState<string | null>(null);
+  const [formEn, setFormEn] = useState('');
+  const [formAr, setFormAr] = useState('');
+  const [savingLab, setSavingLab] = useState(false);
 
   const activeLab = labs?.find((l) => l.id === activeLabId) ?? labs?.[0];
 
@@ -48,21 +50,38 @@ export default function AdminChallengesPage() {
     reorder(labId, ids);
   }
 
-  async function createLab() {
-    if (!newLabEn.trim() || !newLabAr.trim()) return;
-    setCreatingLab(true);
+  function openNewLabForm() {
+    setFormMode('new');
+    setFormLabId(null);
+    setFormEn('');
+    setFormAr('');
+  }
+
+  function openEditLabForm(lab: AdminLab) {
+    setFormMode('edit');
+    setFormLabId(lab.id);
+    setFormEn(lab.titleEn);
+    setFormAr(lab.titleAr);
+  }
+
+  async function saveLabForm() {
+    if (!formEn.trim() || !formAr.trim()) return;
+    setSavingLab(true);
     try {
-      const { data } = await api.post('/admin/labs', { titleEn: newLabEn, titleAr: newLabAr });
+      if (formMode === 'edit' && formLabId) {
+        await api.put(`/admin/labs/${formLabId}`, { titleEn: formEn, titleAr: formAr });
+        toast.success('Lab updated.');
+      } else {
+        const { data } = await api.post('/admin/labs', { titleEn: formEn, titleAr: formAr });
+        setActiveLabId(data.id);
+        toast.success('Lab created.');
+      }
       await queryClient.invalidateQueries({ queryKey: ['admin-labs'] });
-      setActiveLabId(data.id);
-      setShowNewLab(false);
-      setNewLabEn('');
-      setNewLabAr('');
-      toast.success('Lab created.');
+      setFormMode('closed');
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Could not create the lab.');
+      toast.error(err?.response?.data?.error || 'Could not save the lab.');
     } finally {
-      setCreatingLab(false);
+      setSavingLab(false);
     }
   }
 
@@ -84,7 +103,7 @@ export default function AdminChallengesPage() {
           </button>
         ))}
         <button
-          onClick={() => setShowNewLab(true)}
+          onClick={openNewLabForm}
           className="flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-dashed border-slate-300 px-4 py-2 text-sm font-semibold text-slate-500 hover:border-purple-400 hover:text-purple-500 dark:border-slate-700"
         >
           <FolderPlus size={14} />
@@ -93,20 +112,22 @@ export default function AdminChallengesPage() {
       </div>
 
       <AnimatePresence>
-        {showNewLab && (
+        {formMode !== 'closed' && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-6 overflow-hidden">
             <div className="glass flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-end">
               <div className="flex-1">
                 <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Title (English)</label>
-                <input value={newLabEn} onChange={(e) => setNewLabEn(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-white" />
+                <input value={formEn} onChange={(e) => setFormEn(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-white" />
               </div>
               <div className="flex-1">
                 <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">Title (Arabic)</label>
-                <input dir="rtl" value={newLabAr} onChange={(e) => setNewLabAr(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-white" />
+                <input dir="rtl" value={formAr} onChange={(e) => setFormAr(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700/50 dark:bg-slate-800/50 dark:text-white" />
               </div>
               <div className="flex gap-2">
-                <button onClick={createLab} disabled={creatingLab} className="rounded-lg bg-gradient-to-r from-purple-600 to-purple-800 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Create</button>
-                <button onClick={() => setShowNewLab(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500">Cancel</button>
+                <button onClick={saveLabForm} disabled={savingLab} className="rounded-lg bg-gradient-to-r from-purple-600 to-purple-800 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                  {formMode === 'edit' ? 'Save' : 'Create'}
+                </button>
+                <button onClick={() => setFormMode('closed')} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500">Cancel</button>
               </div>
             </div>
           </motion.div>
@@ -118,9 +139,18 @@ export default function AdminChallengesPage() {
       {activeLab && (
         <>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300">
-              {activeLab.challenges.length} challenge{activeLab.challenges.length !== 1 ? 's' : ''}
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                {activeLab.challenges.length} challenge{activeLab.challenges.length !== 1 ? 's' : ''}
+              </h2>
+              <button
+                onClick={() => openEditLabForm(activeLab)}
+                className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:bg-purple-500/10 hover:text-purple-500"
+                title="Edit lab name"
+              >
+                <Pencil size={12} />
+              </button>
+            </div>
             <button
               onClick={() => setEditing({ labId: activeLab.id, challengeId: null })}
               className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-purple-600 to-purple-800 px-4 py-2 text-xs font-bold text-white shadow-[0_0_14px_rgba(147,51,234,0.3)]"

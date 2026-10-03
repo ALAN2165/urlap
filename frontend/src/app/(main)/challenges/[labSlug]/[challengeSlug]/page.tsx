@@ -1,12 +1,12 @@
 'use client';
-import QueryLoader from '@/components/shared/QueryLoader';
+
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowLeft, Lock, Loader2, Zap } from 'lucide-react';
+import { ArrowLeft, Lock, Loader2, Zap, Flag } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { ChallengeDetail, LabDetail, Submission } from '@/types';
@@ -14,6 +14,7 @@ import CodeEditor from '@/components/editor/CodeEditor';
 import OutputPanel from '@/components/editor/OutputPanel';
 import HintPanel from '@/components/challenge/HintPanel';
 import SchemaViewer from '@/components/challenge/SchemaViewer';
+import ReportChallengeModal from '@/components/challenge/ReportChallengeModal';
 
 const POLL_INTERVAL_MS = 600;
 const MAX_POLL_ATTEMPTS = 50;
@@ -39,6 +40,7 @@ export default function ChallengeSolvePage() {
   const [code, setCode] = useState('');
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [running, setRunning] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const cancelRef = useRef({ cancelled: false });
   const currentIdRef = useRef<string | undefined>(undefined);
@@ -106,7 +108,8 @@ export default function ChallengeSolvePage() {
   }
 
   if (isError) return <div className="mx-auto max-w-7xl px-4 py-12 text-red-600 dark:text-red-400 sm:px-6">{t('loadFailed')}</div>;
-if (!challenge) return <QueryLoader />;
+  if (!challenge) return <div className="mx-auto max-w-7xl px-4 py-12 text-slate-500 dark:text-slate-400 sm:px-6">{t('loading')}</div>;
+
   if (challenge.locked) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-20 text-center sm:px-6 sm:py-24">
@@ -153,7 +156,14 @@ if (!challenge) return <QueryLoader />;
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.15 }}>
-          <div className="mb-3 flex items-center justify-end">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <button
+              onClick={() => setReportOpen(true)}
+              className="flex items-center gap-1.5 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-500 hover:border-amber-400 hover:text-amber-600 dark:border-slate-700/50 dark:text-slate-400"
+            >
+              <Flag size={13} />
+              {t('report')}
+            </button>
             <button
               onClick={handleSubmit}
               disabled={running}
@@ -167,6 +177,8 @@ if (!challenge) return <QueryLoader />;
           <OutputPanel submission={submission} running={running} nextHref={nextHref} />
         </motion.div>
       </div>
+
+      <ReportChallengeModal challengeId={challenge.id} open={reportOpen} onClose={() => setReportOpen(false)} />
     </div>
   );
 }

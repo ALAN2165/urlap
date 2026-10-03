@@ -11,6 +11,7 @@ import { adminGetUsers, adminSetUserRole, adminSetUserBan } from '../controllers
 import {
   adminGetAnnouncements, adminCreateAnnouncement, adminUpdateAnnouncement, adminDeleteAnnouncement,
 } from '../controllers/adminAnnouncements.controller';
+import { adminGetReports, adminDeleteReport } from '../controllers/adminReports.controller';
 
 const router = Router();
 router.use(requireAuth, requireAdmin);
@@ -38,5 +39,8 @@ router.get('/announcements', adminGetAnnouncements);
 router.post('/announcements', adminCreateAnnouncement);
 router.put('/announcements/:id', adminUpdateAnnouncement);
 router.delete('/announcements/:id', adminDeleteAnnouncement);
+
+router.get('/reports', adminGetReports);
+router.delete('/reports/:id', adminDeleteReport);
 
 export default router;

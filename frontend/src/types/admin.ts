@@ -29,11 +29,10 @@ export interface AdminChallengeDetail {
 export interface SqlTestResult { ok: boolean; columns: string[]; rows: unknown[][]; message: string; runtimeMs: number; }
 
 export interface AdminUser {
-  id: string;
-  username: string;
-  totalPoints: number;
-  role: 'STUDENT' | 'ADMIN';
-  isBanned: boolean;
-  createdAt: string;
-  solvedCount: number;
+  id: string; username: string; totalPoints: number;
+  role: 'STUDENT' | 'ADMIN'; isBanned: boolean; createdAt: string; solvedCount: number;
+}
+
+export interface AdminReport {
+  id: string; reason: string; createdAt: string; username: string; challengeTitle: string; challengeSlug: string;
 }
