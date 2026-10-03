@@ -49,14 +49,14 @@ export async function adminCreateAnnouncement(req: AuthRequest, res: Response, n
 export async function adminUpdateAnnouncement(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const data = announcementSchema.parse(req.body);
-    const announcement = await prisma.announcement.update({ where: { id: req.params.id }, data });
+    const announcement = await prisma.announcement.update({ where: { id: req.params.id as string}, data });
     res.json(announcement);
   } catch (err) { next(err); }
 }
 
 export async function adminDeleteAnnouncement(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    await prisma.announcement.delete({ where: { id: req.params.id } });
+    await prisma.announcement.delete({ where: { id: req.params.id as string} });
     res.status(204).send();
   } catch (err) { next(err); }
 }

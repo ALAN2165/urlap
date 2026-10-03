@@ -22,7 +22,7 @@ export async function adminGetReports(req: AuthRequest, res: Response, next: Nex
 
 export async function adminDeleteReport(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    await prisma.challengeReport.delete({ where: { id: req.params.id } });
+    await prisma.challengeReport.delete({ where: { id: req.params.id as string } });
     res.status(204).send();
   } catch (err) { next(err); }
 }
