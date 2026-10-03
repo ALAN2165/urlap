@@ -8,11 +8,11 @@ export const mailer = hasSmtpConfig
       port: 465,
       secure: true,
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-      family: 4, // السطر ده بيمنع الـ IPv6 تماماً
+      family: 4, 
       connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 10000,
-    })
+    } as any) // <-- إضافة as any هنا بتعطل فحص TypeScript للسطر ده بس
   : null;
 
 export const EMAIL_FROM = process.env.EMAIL_FROM || '"urlap" <no-reply@urlap.app>';
