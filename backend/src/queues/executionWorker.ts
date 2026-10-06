@@ -4,10 +4,8 @@ import { runInSandbox } from '../services/sandbox/dockerRunner';
 import { runSqlGraded } from '../services/sqlGrader.service';
 import { prisma } from '../config/db';
 import { ExecutionJobData } from './executionQueue';
+import { checkForStruggleAlert } from '../services/alertDetection.service';
 
-// Atomic "insert completion if absent + award points". createMany/skipDuplicates
-// reports whether a row was really created, so points are awarded exactly once,
-// even if two submissions for the same challenge finish at the same moment.
 async function recordCompletion(userId: string, challengeId: string, points: number): Promise<number> {
   return prisma.$transaction(async (tx) => {
     const { count } = await tx.challengeCompletion.createMany({
@@ -81,9 +79,16 @@ const worker = new Worker<ExecutionJobData>(
           pointsAwarded,
         },
       });
+
+      // Deliberately isolated: any failure in struggle detection must never
+      // fail the grading job itself — the student's result is already
+      // correctly saved above, regardless of whether an alert could fire.
+      try {
+        await checkForStruggleAlert(userId, challengeId, status);
+      } catch (alertErr) {
+        console.error(`Struggle-alert check failed for submission ${submissionId}:`, alertErr);
+      }
     } catch (err: any) {
-      // Whatever breaks above, the submission row must always be resolved,
-      // otherwise the frontend would poll a row that never changes.
       console.error(`Execution job crashed for submission ${submissionId}:`, err);
       await prisma.submission
         .update({

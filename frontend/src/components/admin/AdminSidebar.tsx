@@ -4,28 +4,29 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
-import { LayoutDashboard, BookOpen, Users, Megaphone, ArrowLeft, Menu,Flag, X } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Users, Megaphone, Flag, AlertTriangle, ArrowLeft, Menu, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useAlertsStore } from '@/store/alertsStore';
 import LogoOrb from '@/components/shared/LogoOrb';
 
 const SECTIONS = [
-  {
-    label: 'Overview',
-    links: [{ href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true }],
-  },
+  { label: 'Overview', links: [{ href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true, badge: false }] },
   {
     label: 'Manage',
     links: [
-      { href: '/admin/reports', label: 'Reports', icon: Flag, exact: false },
-      { href: '/admin/challenges', label: 'Challenges', icon: BookOpen, exact: false },
-      { href: '/admin/users', label: 'Users', icon: Users, exact: false },
-      { href: '/admin/announcements', label: 'Announcements', icon: Megaphone, exact: false },
+      { href: '/admin/alerts', label: 'Live Alerts', icon: AlertTriangle, exact: false, badge: true },
+      { href: '/admin/challenges', label: 'Challenges', icon: BookOpen, exact: false, badge: false },
+      { href: '/admin/users', label: 'Users', icon: Users, exact: false, badge: false },
+      { href: '/admin/announcements', label: 'Announcements', icon: Megaphone, exact: false, badge: false },
+      { href: '/admin/reports', label: 'Reports', icon: Flag, exact: false, badge: false },
     ],
   },
 ];
 
 function SidebarLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const openAlertCount = useAlertsStore((s) => s.alerts.filter((a) => a.status === 'OPEN').length);
+
   return (
     <nav className="flex flex-col gap-5">
       {SECTIONS.map((section) => (
@@ -40,9 +41,7 @@ function SidebarLinks({ onNavigate }: { onNavigate?: () => void }) {
                   href={link.href}
                   onClick={onNavigate}
                   className={`group relative flex items-center gap-3 overflow-hidden rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-colors ${
-                    active
-                      ? 'text-slate-900 dark:text-white'
-                      : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-white'
+                    active ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   {active && (
@@ -54,7 +53,12 @@ function SidebarLinks({ onNavigate }: { onNavigate?: () => void }) {
                   <span className={`relative z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg transition-colors ${active ? 'bg-purple-500/15 text-purple-500 dark:text-purple-400' : 'bg-slate-100 text-slate-400 dark:bg-slate-800/60 group-hover:text-purple-400'}`}>
                     <link.icon size={15} />
                   </span>
-                  <span className="relative z-10">{link.label}</span>
+                  <span className="relative z-10 flex-1">{link.label}</span>
+                  {link.badge && openAlertCount > 0 && (
+                    <span className="relative z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                      {openAlertCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}

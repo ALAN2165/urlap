@@ -1,5 +1,11 @@
 {
-  "/page": "app/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(auth)/forgot-password/page": "app/(auth)/forgot-password/page.js"
+  "/(main)/challenges/[labSlug]/page": "app/(main)/challenges/[labSlug]/page.js",
+  "/page": "app/page.js",
+  "/(main)/challenges/page": "app/(main)/challenges/page.js",
+  "/(main)/dashboard/page": "app/(main)/dashboard/page.js",
+  "/(main)/challenges/[labSlug]/[challengeSlug]/page": "app/(main)/challenges/[labSlug]/[challengeSlug]/page.js",
+  "/admin/users/page": "app/admin/users/page.js",
+  "/admin/alerts/page": "app/admin/alerts/page.js",
+  "/admin/page": "app/admin/page.js"
 }

@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { SystemHealth } from '@/types/admin';
 
 const TITLES: Record<string, string> = {
+  '/admin/alerts': 'Live Alerts',
   '/admin/reports': 'Reports',
   '/admin': 'Overview',
   '/admin/challenges': 'Challenges Manager',

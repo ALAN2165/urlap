@@ -10,11 +10,11 @@ import announcementRoutes from './routes/announcement.routes';
 import adminRoutes from './routes/admin.routes';
 import playgroundRoutes from './routes/playground.routes';
 import reportRoutes from './routes/report.routes';
+import conversationRoutes from './routes/conversation.routes';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
-// تنظيف الرابط من أي علامات تنصيص أو مسافات أو شرطة مايلة في الآخر
 const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
   .replace(/['"]/g, '') // إزالة علامات التنصيص لو اتكتبت بالغلط
   .split(',')
@@ -36,6 +36,7 @@ const corsOptions: cors.CorsOptions = {
   },
 };
 
+
 app.use(helmet());
 app.use(cors(corsOptions));
 app.use(morgan('dev'));
@@ -49,6 +50,7 @@ app.use('/api/announcements', announcementRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/playground', playgroundRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/conversations', conversationRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 

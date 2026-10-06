@@ -2,12 +2,10 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Users, BookOpen, Send, Target, CheckCircle2, XCircle, Clock, Database, Server, Terminal } from 'lucide-react';
+import { Users, BookOpen, Send, Target, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { AdminOverview, SystemHealth } from '@/types/admin';
-import AdminStatCard from '@/components/admin/AdminStatCard';
-import AdminTrendChart from '@/components/admin/AdminTrendChart';
-import AdminHealthCard from '@/components/admin/AdminHealthCard';
+import AdminAnalyticsCharts from '@/components/admin/analytics/AdminAnalyticsCharts';
 
 const stagger = { animate: { transition: { staggerChildren: 0.08 } } };
 const fadeUp = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
@@ -29,6 +27,18 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+function HealthRow({ label, check }: { label: string; check?: { ok: boolean; detail: string } }) {
+  return (
+    <div className="flex items-start gap-3 px-5 py-3">
+      <span className={`mt-0.5 h-2.5 w-2.5 flex-shrink-0 rounded-full ${!check ? 'bg-slate-300 dark:bg-slate-600' : check.ok ? 'bg-emerald-500' : 'bg-red-500'}`} />
+      <div className="min-w-0">
+        <div className="text-sm font-semibold text-slate-900 dark:text-white">{label}</div>
+        <div className="truncate text-xs text-slate-500 dark:text-slate-400">{check ? check.detail : 'Checking…'}</div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminOverviewPage() {
   const { data, isLoading } = useQuery<AdminOverview>({
     queryKey: ['admin-overview'],
@@ -42,47 +52,55 @@ export default function AdminOverviewPage() {
     refetchInterval: 20000,
   });
 
-  const submissionsDeltaPct =
-    data && data.submissionsYesterday > 0
-      ? Math.round(((data.submissionsToday - data.submissionsYesterday) / data.submissionsYesterday) * 100)
-      : null;
+  const anyDown = health && (!health.database.ok || !health.redis.ok || !health.sqlGrader.ok);
+
+  const stats = [
+    { icon: Users, label: 'Total users', value: data?.totalUsers },
+    { icon: BookOpen, label: 'Labs / Challenges', value: data ? `${data.totalLabs} / ${data.totalChallenges}` : undefined },
+    { icon: Send, label: 'Submissions today', value: data?.submissionsToday },
+    { icon: Target, label: 'Platform success rate', value: data ? `${data.platformSuccessRate}%` : undefined },
+  ];
 
   return (
     <div className="mx-auto max-w-6xl">
-      <motion.div variants={stagger} initial="initial" animate="animate" className="mb-6 grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4">
-        <AdminStatCard icon={Users} label="Total users" value={data?.totalUsers} loading={isLoading} />
-        <AdminStatCard icon={BookOpen} label="Labs / Challenges" value={data ? `${data.totalLabs} / ${data.totalChallenges}` : undefined} loading={isLoading} />
-        <AdminStatCard icon={Send} label="Submissions today" value={data?.submissionsToday} deltaPct={submissionsDeltaPct} loading={isLoading} />
-        <AdminStatCard icon={Target} label="Platform success rate" value={data ? `${data.platformSuccessRate}%` : undefined} loading={isLoading} />
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6 md:mb-8">
+        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white sm:text-3xl">Overview</h1>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Platform activity at a glance.</p>
       </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.05 }} className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <AdminHealthCard icon={Database} label="Database" ok={health?.database.ok} detail={health?.database.detail} />
-        <AdminHealthCard icon={Server} label="Redis (queue)" ok={health?.redis.ok} detail={health?.redis.detail} />
-        <AdminHealthCard icon={Terminal} label="SQL grader" ok={health?.sqlGrader.ok} detail={health?.sqlGrader.detail} />
-      </motion.div>
-
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <AdminTrendChart data={data?.dailyTrend ?? []} />
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.05 }} className="mb-8">
+        <div className="mb-3 flex items-center gap-2">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">System Health</h2>
+          {anyDown && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-0.5 text-xs font-semibold text-red-600 dark:text-red-400">
+              <AlertTriangle size={12} />
+              Issue detected
+            </span>
+          )}
         </div>
-        <div className="glass rounded-2xl p-5">
-          <h3 className="mb-4 text-sm font-bold text-slate-900 dark:text-white">Most active labs</h3>
-          <div className="space-y-3">
-            {data?.topLabs.map((lab, i) => (
-              <div key={lab.labId} className="flex items-center gap-3">
-                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-purple-500/10 text-xs font-bold text-purple-500 dark:text-purple-400">{i + 1}</span>
-                <span className="flex-1 truncate text-sm font-medium text-slate-700 dark:text-slate-300">{lab.title}</span>
-                <span className="flex-shrink-0 text-xs font-bold text-slate-400 dark:text-slate-500">{lab.count}</span>
-              </div>
-            ))}
-            {(!data || data.topLabs.length === 0) && <p className="text-xs text-slate-400 dark:text-slate-500">No completions yet.</p>}
-          </div>
+        <div className="glass divide-y divide-slate-100 overflow-hidden rounded-2xl dark:divide-slate-800/60">
+          <HealthRow label="Database" check={health?.database} />
+          <HealthRow label="Redis (submission queue)" check={health?.redis} />
+          <HealthRow label="SQL grader" check={health?.sqlGrader} />
         </div>
       </motion.div>
 
-      <h2 className="mb-4 text-lg font-bold text-slate-900 dark:text-white">Recent activity</h2>
-      <div className="glass overflow-hidden rounded-2xl">
+      <motion.div variants={stagger} initial="initial" animate="animate" className="mb-8 grid grid-cols-2 gap-4 sm:gap-5 lg:grid-cols-4">
+        {stats.map((s) => (
+          <motion.div key={s.label} variants={fadeUp} className="glass rounded-2xl p-5">
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10">
+              <s.icon size={18} className="text-purple-400" />
+            </div>
+            <div dir="ltr" className="text-xl font-extrabold text-slate-900 dark:text-white sm:text-2xl">
+              {isLoading ? '—' : s.value}
+            </div>
+            <div className="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">{s.label}</div>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      <h2 className="mb-4 text-lg font-bold text-slate-900 dark:text-white">Recent submissions</h2>
+      <div className="glass mb-8 overflow-hidden rounded-2xl">
         {isLoading && <div className="p-6 text-sm text-slate-500 dark:text-slate-400">Loading…</div>}
         {data && data.recentSubmissions.length === 0 && <div className="p-6 text-sm text-slate-500 dark:text-slate-400">No submissions yet.</div>}
         {data?.recentSubmissions.map((s, i) => {
@@ -104,6 +122,9 @@ export default function AdminOverviewPage() {
           );
         })}
       </div>
+
+      <h2 className="mb-4 text-lg font-bold text-slate-900 dark:text-white">Analytics</h2>
+      <AdminAnalyticsCharts />
     </div>
   );
 }

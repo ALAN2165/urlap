@@ -48,6 +48,17 @@ enum Role {
   ADMIN
 }
 
+enum ConversationStatus {
+  OPEN
+  CLOSED
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
 model User {
   id                        String   @id @default(cuid())
   username                  String   @unique
@@ -68,6 +79,11 @@ model User {
   hintUsages       HintUsage[]
   resetTokens      PasswordResetToken[]
   challengeReports ChallengeReport[]
+
+  conversationsAsUser  Conversation[] @relation("ConversationsAsUser")
+  conversationsAsAdmin Conversation[] @relation("ConversationsAsAdmin")
+  messages             Message[]
+  alerts               Alert[]        @relation("AlertsForUser")
 
   @@map("users")
 }
@@ -128,12 +144,14 @@ model Challenge {
   categoryId String?
   category   Category? @relation(fields: [categoryId], references: [id])
 
-  starterCodes StarterCode[]
-  testCases    TestCase[]
-  hints        Hint[]
-  submissions  Submission[]
-  completions  ChallengeCompletion[]
-  reports      ChallengeReport[]
+  starterCodes  StarterCode[]
+  testCases     TestCase[]
+  hints         Hint[]
+  submissions   Submission[]
+  completions   ChallengeCompletion[]
+  reports       ChallengeReport[]
+  alerts        Alert[]
+  conversations Conversation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -246,4 +264,56 @@ model ChallengeReport {
   createdAt   DateTime  @default(now())
 
   @@map("challenge_reports")
+}
+
+// ---------------------------------------------------------------------------
+// Proactive support & live chat
+// ---------------------------------------------------------------------------
+
+model Conversation {
+  id          String             @id @default(cuid())
+  userId      String
+  user        User               @relation("ConversationsAsUser", fields: [userId], references: [id], onDelete: Cascade)
+  adminId     String?
+  admin       User?              @relation("ConversationsAsAdmin", fields: [adminId], references: [id])
+  challengeId String?
+  challenge   Challenge?         @relation(fields: [challengeId], references: [id])
+  status      ConversationStatus @default(OPEN)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  messages Message[]
+  alerts   Alert[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content        String       @db.Text
+  createdAt      DateTime     @default(now())
+  readAt         DateTime?
+
+  @@map("messages")
+}
+
+model Alert {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation("AlertsForUser", fields: [userId], references: [id], onDelete: Cascade)
+  challengeId    String
+  challenge      Challenge     @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id])
+  reason         String
+  failCount      Int           @default(0)
+  status         AlertStatus   @default(OPEN)
+  createdAt      DateTime      @default(now())
+  resolvedAt     DateTime?
+
+  @@map("alerts")
 }
