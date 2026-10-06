@@ -34,7 +34,7 @@ export default function HorizontalBarChart({ data, color = '#a855f7', height = 2
             border: `1px solid ${isDark ? 'rgba(168,85,247,0.3)' : '#e2e8f0'}`,
             borderRadius: 12, fontSize: 12, color: isDark ? '#fff' : '#0f172a',
           }}
-          formatter={(value: number) => [`${value}${valueSuffix}`, '']}
+formatter={(value: any) => [`${value}${valueSuffix}`, '']}
           labelFormatter={() => ''}
         />
         <Bar dataKey="value" radius={[0, 8, 8, 0]} maxBarSize={22}>
