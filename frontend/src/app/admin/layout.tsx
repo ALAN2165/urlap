@@ -26,10 +26,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useAdminAlertsSocket();
 
   const { data: initialAlerts } = useQuery<AdminAlert[]>({
-    queryKey: ['admin-alerts'],
-    queryFn: async () => (await api.get('/admin/alerts')).data,
-    enabled: !!user && user.role === 'ADMIN',
-  });
+  queryKey: ['admin-alerts'],
+  queryFn: async () => (await api.get('/admin/alerts')).data,
+  enabled: !!user && user.role === 'ADMIN',
+  refetchInterval: 20000,
+});
 
   useEffect(() => {
     if (initialAlerts) setAlerts(initialAlerts);

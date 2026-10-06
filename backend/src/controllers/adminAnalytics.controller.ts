@@ -7,7 +7,7 @@ const FAILURE_STATUSES = ['WRONG_ANSWER', 'RUNTIME_ERROR', 'COMPILE_ERROR', 'TIM
 
 export async function adminGetAnalytics(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const [failedGroups, totalGroups, hintGroups, overallAvgRows, perChallengeAttemptsRows] = await Promise.all([
+    const [failedGroups, totalGroups, hintGroups, overallAvgRows, perChallengeAttemptsRows, statusGroups] = await Promise.all([
       prisma.submission.groupBy({
         by: ['challengeId'],
         where: { status: { in: [...FAILURE_STATUSES] } },
@@ -26,8 +26,6 @@ export async function adminGetAnalytics(req: AuthRequest, res: Response, next: N
         orderBy: { _count: { hintId: 'desc' } },
         take: 8,
       }),
-      // Overall average, over ALL completions (not just the top 8) —
-      // kept as its own query so the chart's LIMIT 8 below never biases it.
       prisma.$queryRaw<{ avgAttempts: number | null }[]>(Prisma.sql`
         SELECT AVG(sub_count)::float AS "avgAttempts" FROM (
           SELECT cc."userId", cc."challengeId", COUNT(s.id) AS sub_count
@@ -36,8 +34,6 @@ export async function adminGetAnalytics(req: AuthRequest, res: Response, next: N
           GROUP BY cc."userId", cc."challengeId"
         ) sub
       `),
-      // Per-challenge breakdown for the chart — which challenges take the
-      // most tries on average, i.e. the real "hardest" ones in practice.
       prisma.$queryRaw<{ challengeId: string; title: string; avgAttempts: number; solveCount: number }[]>(Prisma.sql`
         SELECT c.id AS "challengeId", c."titleEn" AS title, AVG(sub_count)::float AS "avgAttempts", COUNT(*)::int AS "solveCount"
         FROM (
@@ -51,14 +47,16 @@ export async function adminGetAnalytics(req: AuthRequest, res: Response, next: N
         ORDER BY "avgAttempts" DESC
         LIMIT 8
       `),
+      prisma.submission.groupBy({
+        by: ['status'],
+        where: { status: { notIn: ['PENDING', 'RUNNING'] } },
+        _count: { status: true },
+      }),
     ]);
 
     const totalByChallenge = new Map(totalGroups.map((g) => [g.challengeId, g._count.challengeId]));
     const failedChallengeIds = failedGroups.map((g) => g.challengeId);
-    const challenges = await prisma.challenge.findMany({
-      where: { id: { in: failedChallengeIds } },
-      select: { id: true, titleEn: true },
-    });
+    const challenges = await prisma.challenge.findMany({ where: { id: { in: failedChallengeIds } }, select: { id: true, titleEn: true } });
     const challengeTitleMap = new Map(challenges.map((c) => [c.id, c.titleEn]));
 
     const mostFailedChallenges = failedGroups.map((g) => {
@@ -73,10 +71,7 @@ export async function adminGetAnalytics(req: AuthRequest, res: Response, next: N
     });
 
     const hintIds = hintGroups.map((g) => g.hintId);
-    const hints = await prisma.hint.findMany({
-      where: { id: { in: hintIds } },
-      select: { id: true, order: true, challenge: { select: { titleEn: true } } },
-    });
+    const hints = await prisma.hint.findMany({ where: { id: { in: hintIds } }, select: { id: true, order: true, challenge: { select: { titleEn: true } } } });
     const hintMap = new Map(hints.map((h) => [h.id, h]));
 
     const mostUsedHints = hintGroups.map((g) => {
@@ -85,7 +80,7 @@ export async function adminGetAnalytics(req: AuthRequest, res: Response, next: N
         hintId: g.hintId,
         challengeTitle: hint?.challenge.titleEn ?? 'Unknown challenge',
         hintOrder: hint?.order ?? 0,
-        studentCount: g._count.hintId, // distinct students — see HintUsage's unique constraint
+        studentCount: g._count.hintId,
       };
     });
 
@@ -94,11 +89,10 @@ export async function adminGetAnalytics(req: AuthRequest, res: Response, next: N
       mostUsedHints,
       overallAvgAttempts: overallAvgRows[0]?.avgAttempts ?? 0,
       hardestChallengesByAttempts: perChallengeAttemptsRows.map((r) => ({
-        challengeId: r.challengeId,
-        title: r.title,
-        avgAttempts: Math.round(r.avgAttempts * 10) / 10,
-        solveCount: r.solveCount,
+        challengeId: r.challengeId, title: r.title,
+        avgAttempts: Math.round(r.avgAttempts * 10) / 10, solveCount: r.solveCount,
       })),
+      statusBreakdown: statusGroups.map((g) => ({ status: g.status, count: g._count.status })),
     });
   } catch (err) { next(err); }
 }

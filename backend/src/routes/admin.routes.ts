@@ -8,12 +8,12 @@ import {
   adminGetChallenge, adminCreateChallenge, adminUpdateChallenge, adminDeleteChallenge, adminReorderChallenges,
 } from '../controllers/adminChallenges.controller';
 import { adminTestSql } from '../controllers/adminSql.controller';
-import { adminGetUsers, adminSetUserRole, adminSetUserBan } from '../controllers/adminUsers.controller';
+import { adminGetUsers, adminSetUserRole, adminSetUserBan, adminGetUserSubmissions } from '../controllers/adminUsers.controller';
 import {
   adminGetAnnouncements, adminCreateAnnouncement, adminUpdateAnnouncement, adminDeleteAnnouncement,
 } from '../controllers/adminAnnouncements.controller';
-import { adminGetReports, adminDeleteReport } from '../controllers/adminReports.controller';
-import { adminGetAlerts, adminAcknowledgeAlert, adminResolveAlert } from '../controllers/alert.controller';
+import { adminGetReports, adminDeleteReport, adminReplyToReport } from '../controllers/adminReports.controller';
+import { adminGetAlerts, adminAcknowledgeAlert, adminResolveAlert, adminTriggerTestAlert } from '../controllers/alert.controller';
 import { adminGetConversationMessages, adminPostMessage, adminCloseConversation } from '../controllers/chat.controller';
 
 const router = Router();
@@ -38,6 +38,7 @@ router.post('/sql-test', adminTestSql);
 router.get('/users', adminGetUsers);
 router.put('/users/:id/role', adminSetUserRole);
 router.put('/users/:id/ban', adminSetUserBan);
+router.get('/users/:id/submissions', adminGetUserSubmissions);
 
 router.get('/announcements', adminGetAnnouncements);
 router.post('/announcements', adminCreateAnnouncement);
@@ -46,10 +47,12 @@ router.delete('/announcements/:id', adminDeleteAnnouncement);
 
 router.get('/reports', adminGetReports);
 router.delete('/reports/:id', adminDeleteReport);
+router.post('/reports/:id/reply', adminReplyToReport);
 
 router.get('/alerts', adminGetAlerts);
 router.put('/alerts/:id/acknowledge', adminAcknowledgeAlert);
 router.put('/alerts/:id/resolve', adminResolveAlert);
+router.post('/alerts/test', adminTriggerTestAlert);
 
 router.get('/conversations/:id/messages', adminGetConversationMessages);
 router.post('/conversations/:id/messages', adminPostMessage);

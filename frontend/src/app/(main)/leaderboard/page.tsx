@@ -60,7 +60,7 @@ export default function LeaderboardPage() {
         </div>
       )}
 
-      {entries && entries.length === 0 && <p className="py-12 text-center text-slate-500 dark:text-slate-400">{t('empty')}</p>}
+      {entries && entries.length === 0 && <p className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">{t('empty')}</p>}
 
       {entries && entries.length > 0 && (
         <motion.div variants={stagger} initial="initial" animate="animate" className="glass overflow-hidden rounded-2xl">
@@ -84,7 +84,7 @@ export default function LeaderboardPage() {
                 <span className={`w-8 text-center font-mono text-sm font-bold ${isTop3 ? RANK_ACCENT[entry.rank] : 'text-slate-400 dark:text-slate-500'}`}>
                   {entry.rank}
                 </span>
-                <AvatarCircle name={entry.username} size={36} avatarUrl={entry.avatarUrl} />
+                <AvatarCircle name={entry.username} avatarUrl={entry.avatarUrl} size={36} />
                 <span className="flex-1 truncate font-semibold text-slate-900 dark:text-white">{entry.username}</span>
                 <span className="font-mono text-sm font-bold text-purple-600 dark:text-purple-400">{entry.totalPoints}</span>
               </motion.div>
@@ -95,7 +95,7 @@ export default function LeaderboardPage() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
               className="flex items-center gap-4 border-t-2 border-purple-500/30 bg-slate-100 px-5 py-3 dark:bg-slate-700/40">
               <span className="w-8 text-center font-mono text-sm font-bold text-slate-500 dark:text-slate-300">{stats.rank}</span>
-              <AvatarCircle name={user.username} size={36} avatarUrl={user.avatarUrl} />
+              <AvatarCircle name={user.username} avatarUrl={user.avatarUrl} size={36} />
               <span className="flex flex-1 items-center gap-2 truncate font-semibold text-slate-900 dark:text-white">
                 {user.username}
                 <span className="rounded-full bg-purple-500/15 px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-400">{t('you')}</span>

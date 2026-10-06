@@ -12,14 +12,9 @@ const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
 
 export function initSocket(server: HttpServer): IOServer {
   io = new IOServer(server, {
-    cors: {
-      origin: allowedOrigins,
-      credentials: true,
-    },
+    cors: { origin: allowedOrigins, credentials: true },
   });
 
-  // Every connecting client must present the same JWT issued by the REST
-  // login/register endpoints — one auth system, not two.
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token as string | undefined;
@@ -44,14 +39,8 @@ export function initSocket(server: HttpServer): IOServer {
   io.on('connection', (socket) => {
     const { userId, role, username } = socket.data as { userId: string; role: string; username: string };
 
-    // Personal room per user — lets us target "this user" (across every
-    // tab/device they have open) without tracking raw socket IDs anywhere
-    // else in the app. Admins additionally join a shared "admins" room so
-    // a broadcast like a new alert reaches every admin on duty at once.
     socket.join(`user:${userId}`);
-    if (role === 'ADMIN') {
-      socket.join('admins');
-    }
+    if (role === 'ADMIN') socket.join('admins');
 
     console.log(`[socket] ${username} (${role}) connected — socket ${socket.id}`);
 
@@ -68,14 +57,23 @@ export function getIO(): IOServer {
   return io;
 }
 
-/** Emits an event to every connection a specific user currently has open. */
 export function emitToUser(userId: string, event: string, payload: unknown): void {
-  if (!io) return; // never crash a caller just because the socket layer isn't up yet
+  if (!io) {
+    console.warn(`[socket] emitToUser('${event}') skipped — Socket.io not initialized yet.`);
+    return;
+  }
   io.to(`user:${userId}`).emit(event, payload);
 }
 
-/** Emits an event to every currently-connected admin. */
+/** Logs how many admin sockets are actually in the room before emitting —
+ *  the single most useful fact for diagnosing "the alert didn't show up":
+ *  if this logs 0, the admin dashboard simply isn't connected right now. */
 export function emitToAdmins(event: string, payload: unknown): void {
-  if (!io) return;
+  if (!io) {
+    console.warn(`[socket] emitToAdmins('${event}') skipped — Socket.io not initialized yet.`);
+    return;
+  }
+  const roomSize = io.sockets.adapter.rooms.get('admins')?.size ?? 0;
+  console.log(`[socket] emitToAdmins('${event}') → ${roomSize} admin connection(s) currently in the room.`);
   io.to('admins').emit(event, payload);
 }

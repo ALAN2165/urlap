@@ -23,6 +23,12 @@ const worker = new Worker<ExecutionJobData>(
   async (job: Job<ExecutionJobData>) => {
     const { submissionId, challengeId, userId, language, code } = job.data;
 
+    // Canary: if this line never appears in your logs after submitting,
+    // the worker isn't receiving jobs at all — check that the backend
+    // process actually imports './queues/executionWorker' (see index.ts)
+    // and that Redis is reachable (check /admin → System Health).
+    console.log(`[worker] Job received — job ${job.id}, submission ${submissionId}`);
+
     try {
       const challenge = await prisma.challenge.findUniqueOrThrow({
         where: { id: challengeId },
@@ -46,11 +52,8 @@ const worker = new Worker<ExecutionJobData>(
         errorMsg = result.errorMessage;
         runtimeMs = result.runtimeMs;
         resultJson = JSON.stringify({
-          columns: result.resultColumns,
-          rows: result.resultRows,
-          totalRows: result.totalRows,
-          expectedRowCount: result.expectedRowCount,
-          failureReason: result.failureReason,
+          columns: result.resultColumns, rows: result.resultRows,
+          totalRows: result.totalRows, expectedRowCount: result.expectedRowCount, failureReason: result.failureReason,
         });
       } else {
         allPassed = true;
@@ -70,38 +73,31 @@ const worker = new Worker<ExecutionJobData>(
 
       await prisma.submission.update({
         where: { id: submissionId },
-        data: {
-          status: status as any,
-          actualOutput: output,
-          errorMessage: errorMsg || null,
-          resultJson,
-          runtimeMs,
-          pointsAwarded,
-        },
+        data: { status: status as any, actualOutput: output, errorMessage: errorMsg || null, resultJson, runtimeMs, pointsAwarded },
       });
 
-      // Deliberately isolated: any failure in struggle detection must never
-      // fail the grading job itself — the student's result is already
-      // correctly saved above, regardless of whether an alert could fire.
+      console.log(`[worker] Submission ${submissionId} graded as ${status} — now checking struggle alert.`);
+
       try {
         await checkForStruggleAlert(userId, challengeId, status);
       } catch (alertErr) {
-        console.error(`Struggle-alert check failed for submission ${submissionId}:`, alertErr);
+        // This is almost certainly where a schema/migration problem would
+        // surface. Check this log line's message, or check /admin → System
+        // Health → "Realtime/Chat schema" for the same diagnosis without
+        // needing to read logs at all.
+        console.error(`[worker] Struggle-alert check FAILED for submission ${submissionId}:`, alertErr);
       }
     } catch (err: any) {
-      console.error(`Execution job crashed for submission ${submissionId}:`, err);
+      console.error(`[worker] Execution job crashed for submission ${submissionId}:`, err);
       await prisma.submission
-        .update({
-          where: { id: submissionId },
-          data: { status: 'RUNTIME_ERROR', errorMessage: err.message || 'Internal execution error.', pointsAwarded: 0 },
-        })
-        .catch((updateErr) => console.error('Even the failure-update failed:', updateErr));
+        .update({ where: { id: submissionId }, data: { status: 'RUNTIME_ERROR', errorMessage: err.message || 'Internal execution error.', pointsAwarded: 0 } })
+        .catch((updateErr) => console.error('[worker] Even the failure-update failed:', updateErr));
     }
   },
   { connection: redisConnection, concurrency: 4 }
 );
 
-worker.on('failed', (job, err) => console.error(`Job ${job?.id} failed:`, err));
-worker.on('error', (err) => console.error('Worker connection error. Check that Redis is running:', err));
+worker.on('failed', (job, err) => console.error(`[worker] Job ${job?.id} failed:`, err));
+worker.on('error', (err) => console.error('[worker] Connection error — check that Redis is running:', err));
 
 export default worker;

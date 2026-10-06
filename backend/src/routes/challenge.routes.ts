@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getLabs, getLab, getChallenge } from '../controllers/challenge.controller';
+import { getChallenge, getChallengeSampleData, getLabs, getLab } from '../controllers/challenge.controller';
 import { reveal } from '../controllers/hint.controller';
 import { requireAuth } from '../middleware/authMiddleware';
 
@@ -11,6 +11,7 @@ router.use(requireAuth);
 
 router.get('/labs', getLabs);
 router.get('/labs/:labSlug', getLab);
+router.get('/:slug/preview-data', getChallengeSampleData);
 router.post('/hints/:hintId/reveal', reveal);
 router.get('/:slug', getChallenge);
 

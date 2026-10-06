@@ -15,10 +15,12 @@ import OutputPanel from '@/components/editor/OutputPanel';
 import HintPanel from '@/components/challenge/HintPanel';
 import SchemaViewer from '@/components/challenge/SchemaViewer';
 import ReportChallengeModal from '@/components/challenge/ReportChallengeModal';
+import LiveSampleDataViewer from '@/components/challenge/LiveSampleDataViewer';
 
 const POLL_INTERVAL_MS = 600;
 const MAX_POLL_ATTEMPTS = 50;
 const REQUEST_TIMEOUT_MS = 10000;
+const PASTE_FLAG_MIN_LENGTH = 20; // ignore trivial pastes like a single word
 
 export default function ChallengeSolvePage() {
   const { labSlug, challengeSlug } = useParams<{ labSlug: string; challengeSlug: string }>();
@@ -46,6 +48,11 @@ export default function ChallengeSolvePage() {
   const currentIdRef = useRef<string | undefined>(undefined);
   currentIdRef.current = challenge?.id;
 
+  // Anti-cheating signal tracking — reset per challenge and per attempt.
+  const pasteDetectedRef = useRef(false);
+  const tabSwitchCountRef = useRef(0);
+  const startTimeRef = useRef(Date.now());
+
   useEffect(() => {
     cancelRef.current.cancelled = false;
     return () => { cancelRef.current.cancelled = true; };
@@ -56,7 +63,25 @@ export default function ChallengeSolvePage() {
     setCode(challenge.starterCodes[0]?.code ?? '-- write your SQL query here\n');
     setSubmission(null);
     setRunning(false);
+    pasteDetectedRef.current = false;
+    tabSwitchCountRef.current = 0;
+    startTimeRef.current = Date.now();
   }, [challenge?.id]);
+
+  // Counts how many times the user left this tab while on the current
+  // attempt — tracked purely for admin visibility, never used to block
+  // or auto-penalize anything.
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.hidden) tabSwitchCountRef.current += 1;
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
+  function handlePaste(pastedLength: number) {
+    if (pastedLength > PASTE_FLAG_MIN_LENGTH) pasteDetectedRef.current = true;
+  }
 
   async function pollUntilDone(id: string): Promise<Submission | null> {
     for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
@@ -86,8 +111,21 @@ export default function ChallengeSolvePage() {
     setRunning(true);
     setSubmission(null);
 
+    // Snapshot this attempt's anti-cheat signals, then reset immediately so
+    // the NEXT attempt starts tracking fresh instead of accumulating.
+    const isPasted = pasteDetectedRef.current;
+    const timeSpentSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
+    const tabSwitches = tabSwitchCountRef.current;
+    pasteDetectedRef.current = false;
+    tabSwitchCountRef.current = 0;
+    startTimeRef.current = Date.now();
+
     try {
-      const { data } = await api.post('/submissions', { challengeId: challenge.id, language: 'SQL', code }, { timeout: REQUEST_TIMEOUT_MS });
+      const { data } = await api.post(
+        '/submissions',
+        { challengeId: challenge.id, language: 'SQL', code, isPasted, timeSpentSeconds, tabSwitches },
+        { timeout: REQUEST_TIMEOUT_MS }
+      );
       const finished = await pollUntilDone(data.submissionId);
 
       if (cancelRef.current.cancelled || currentIdRef.current !== startedFor) return;
@@ -151,8 +189,9 @@ export default function ChallengeSolvePage() {
             <p className="whitespace-pre-line leading-relaxed text-slate-700 dark:text-slate-300">{description}</p>
           </div>
 
-          <SchemaViewer schemaJson={challenge.schemaJson} />
-          <HintPanel hints={challenge.hints} />
+         <SchemaViewer schemaJson={challenge.schemaJson} />
+<LiveSampleDataViewer challengeSlug={challengeSlug} />
+<HintPanel hints={challenge.hints} />
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.15 }}>
@@ -173,7 +212,7 @@ export default function ChallengeSolvePage() {
               {running ? t('checking') : t('submitQuery')}
             </button>
           </div>
-          <CodeEditor value={code} onChange={setCode} language="SQL" />
+          <CodeEditor value={code} onChange={setCode} language="SQL" onPaste={handlePaste} />
           <OutputPanel submission={submission} running={running} nextHref={nextHref} />
         </motion.div>
       </div>

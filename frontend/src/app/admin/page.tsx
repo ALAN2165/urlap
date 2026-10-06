@@ -52,8 +52,7 @@ export default function AdminOverviewPage() {
     refetchInterval: 20000,
   });
 
-  const anyDown = health && (!health.database.ok || !health.redis.ok || !health.sqlGrader.ok);
-
+const anyDown = health && (!health.database.ok || !health.redis.ok || !health.sqlGrader.ok || !health.realtimeSchema.ok);
   const stats = [
     { icon: Users, label: 'Total users', value: data?.totalUsers },
     { icon: BookOpen, label: 'Labs / Challenges', value: data ? `${data.totalLabs} / ${data.totalChallenges}` : undefined },
@@ -82,6 +81,7 @@ export default function AdminOverviewPage() {
           <HealthRow label="Database" check={health?.database} />
           <HealthRow label="Redis (submission queue)" check={health?.redis} />
           <HealthRow label="SQL grader" check={health?.sqlGrader} />
+          <HealthRow label="Realtime / Chat schema" check={health?.realtimeSchema} />
         </div>
       </motion.div>
 

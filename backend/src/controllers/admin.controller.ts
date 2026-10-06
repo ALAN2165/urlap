@@ -57,10 +57,7 @@ export async function getOverview(req: AuthRequest, res: Response, next: NextFun
       entry.count += 1;
       labCounts.set(lab.id, entry);
     }
-    const topLabs = [...labCounts.entries()]
-      .map(([labId, v]) => ({ labId, title: v.title, count: v.count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+    const topLabs = [...labCounts.entries()].map(([labId, v]) => ({ labId, title: v.title, count: v.count })).sort((a, b) => b.count - a.count).slice(0, 5);
 
     res.json({
       totalUsers, totalLabs, totalChallenges, submissionsToday, submissionsYesterday,
@@ -101,6 +98,16 @@ export async function getHealth(req: AuthRequest, res: Response, next: NextFunct
     }
   } catch (err: any) {
     checks.sqlGrader = { ok: false, detail: `${err.message} — run setupSqlPlayground.ts against this database` };
+  }
+
+  // Directly targets this round's critical bug: if the Alert/Conversation/
+  // Message tables don't exist in this database, this check fails and
+  // tells you exactly why — no log-tailing required.
+  try {
+    await prisma.alert.count();
+    checks.realtimeSchema = { ok: true, detail: 'Alert/Conversation/Message/Inbox tables are reachable' };
+  } catch (err: any) {
+    checks.realtimeSchema = { ok: false, detail: `${err.message} — run "npx prisma migrate deploy" against this database` };
   }
 
   res.json(checks);

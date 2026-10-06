@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { Play, Loader2, CheckCircle2, XCircle, Database as DatabaseIcon } from 'lucide-react';
 import { api } from '@/lib/api';
 import CodeEditor from '@/components/editor/CodeEditor';
 import SchemaViewer from '@/components/challenge/SchemaViewer';
+import DataTable from '@/components/shared/DataTable';
 
 const EMPLOYEES_SCHEMA = JSON.stringify({
   tables: [
@@ -40,6 +42,11 @@ export default function PlaygroundPage() {
   const [result, setResult] = useState<PlaygroundResult | null>(null);
   const [running, setRunning] = useState(false);
 
+  const { data: sampleData, isLoading: sampleLoading } = useQuery<PlaygroundResult>({
+    queryKey: ['playground-sample-employees'],
+    queryFn: async () => (await api.post('/playground/run', { sql: 'SELECT * FROM employees LIMIT 5;' })).data,
+  });
+
   async function run() {
     setRunning(true);
     setResult(null);
@@ -66,8 +73,20 @@ export default function PlaygroundPage() {
       </motion.div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-1">
+        <div className="space-y-4 lg:col-span-1">
           <SchemaViewer schemaJson={EMPLOYEES_SCHEMA} />
+          <div>
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <DatabaseIcon size={12} className="text-purple-400" />
+              Sample data — employees
+            </div>
+            <DataTable
+              columns={sampleData?.columns ?? []}
+              rows={sampleData?.rows ?? []}
+              loading={sampleLoading}
+              error={!sampleLoading && sampleData && !sampleData.ok ? sampleData.message : null}
+            />
+          </div>
         </div>
 
         <div className="lg:col-span-2">
@@ -91,30 +110,7 @@ export default function PlaygroundPage() {
                 <span className="whitespace-pre-line">{result.message}</span>
                 {result.ok && <span dir="ltr" className="ml-auto flex-shrink-0 font-mono text-[10px] opacity-70">{result.runtimeMs}ms</span>}
               </div>
-              {result.columns.length > 0 && (
-                <div dir="ltr" className="scroll-thin max-h-96 overflow-auto">
-                  <table className="w-full border-collapse text-left font-mono text-xs">
-                    <thead>
-                      <tr>
-                        {result.columns.map((c, i) => (
-                          <th key={i} className="sticky top-0 whitespace-nowrap border-b border-slate-200 bg-slate-50 px-3 py-2 font-semibold text-purple-700 dark:border-slate-700/50 dark:bg-slate-800 dark:text-purple-300">{c}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.rows.map((row, ri) => (
-                        <tr key={ri} className="border-b border-slate-100 even:bg-slate-50/70 dark:border-slate-800/60 dark:even:bg-slate-800/20">
-                          {row.map((cell, ci) => (
-                            <td key={ci} className="whitespace-nowrap px-3 py-1.5 text-slate-700 dark:text-slate-300">
-                              {cell === null ? <span className="italic text-slate-400">NULL</span> : String(cell)}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <DataTable columns={result.columns} rows={result.rows} error={!result.ok ? null : null} />
             </motion.div>
           )}
         </div>

@@ -12,8 +12,7 @@ export interface AdminOverview {
   dailyTrend: TrendPoint[]; topLabs: TopLab[]; recentSubmissions: RecentSubmission[];
 }
 export interface HealthCheck { ok: boolean; detail: string; }
-export interface SystemHealth { database: HealthCheck; redis: HealthCheck; sqlGrader: HealthCheck; }
-
+export interface SystemHealth { database: HealthCheck; redis: HealthCheck; sqlGrader: HealthCheck; realtimeSchema: HealthCheck; }
 export interface AdminChallengeSummary {
   id: string; slug: string; titleEn: string; titleAr: string;
   difficulty: string; points: number; orderIndex: number;
@@ -33,20 +32,23 @@ export interface SqlTestResult { ok: boolean; columns: string[]; rows: unknown[]
 export interface AdminUser {
   id: string; username: string; totalPoints: number;
   role: 'STUDENT' | 'ADMIN'; isBanned: boolean; createdAt: string; solvedCount: number;
+  avatarUrl?: string | null;
 }
 
 export interface AdminReport {
-  id: string; reason: string; createdAt: string; username: string; challengeTitle: string; challengeSlug: string;
+  id: string; reason: string; createdAt: string; username: string; challengeTitle: string; challengeSlug: string; replied: boolean;
 }
 
 export interface MostFailedChallenge { challengeId: string; title: string; failedCount: number; totalAttempts: number; failureRatePct: number; }
 export interface MostUsedHint { hintId: string; challengeTitle: string; hintOrder: number; studentCount: number; }
 export interface HardestChallenge { challengeId: string; title: string; avgAttempts: number; solveCount: number; }
+export interface StatusBreakdownPoint { status: string; count: number; }
 export interface AdminAnalytics {
   mostFailedChallenges: MostFailedChallenge[];
   mostUsedHints: MostUsedHint[];
   overallAvgAttempts: number;
   hardestChallengesByAttempts: HardestChallenge[];
+  statusBreakdown: StatusBreakdownPoint[];
 }
 
 export interface AdminAlert {
@@ -56,4 +58,11 @@ export interface AdminAlert {
 }
 export interface AdminConversation {
   id: string; username: string; challengeTitle: string | null; status: 'OPEN' | 'CLOSED'; messages: ChatMessage[];
+}
+
+export interface AdminUserSubmission {
+  id: string; status: string; code: string; errorMessage: string | null; actualOutput: string | null;
+  runtimeMs: number | null; pointsAwarded: number; createdAt: string;
+  isPasted: boolean; timeSpentSeconds: number | null; tabSwitches: number;
+  challenge: { titleEn: string; slug: string };
 }

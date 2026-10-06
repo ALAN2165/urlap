@@ -11,6 +11,7 @@ import adminRoutes from './routes/admin.routes';
 import playgroundRoutes from './routes/playground.routes';
 import reportRoutes from './routes/report.routes';
 import conversationRoutes from './routes/conversation.routes';
+import inboxRoutes from './routes/inbox.routes';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -37,6 +38,7 @@ const corsOptions: cors.CorsOptions = {
 };
 
 
+
 app.use(helmet());
 app.use(cors(corsOptions));
 app.use(morgan('dev'));
@@ -51,6 +53,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/playground', playgroundRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/conversations', conversationRoutes);
+app.use('/api/inbox', inboxRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 

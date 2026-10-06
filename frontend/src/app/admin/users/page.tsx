@@ -73,7 +73,7 @@ export default function AdminUsersPage() {
               className={`glass flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center ${u.isBanned ? 'opacity-70' : ''}`}
             >
               <div className="flex min-w-0 flex-1 items-center gap-3">
-                <AvatarCircle name={u.username} size={38} />
+                <AvatarCircle name={u.username} avatarUrl={u.avatarUrl} size={38} />
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate text-sm font-bold text-slate-900 dark:text-white">{u.username}</span>

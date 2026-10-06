@@ -4,16 +4,17 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
-import { LayoutDashboard, BookOpen, Users, Megaphone, Flag, AlertTriangle, ArrowLeft, Menu, X } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Users, Megaphone, Flag, AlertTriangle, ArrowLeft, Menu, X, UserSearch } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAlertsStore } from '@/store/alertsStore';
 import LogoOrb from '@/components/shared/LogoOrb';
 
 const SECTIONS = [
-  { label: 'Overview', links: [{ href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true, badge: false }] },
+  { label: 'Overview', links: [{ href: '/admin', label: 'Dashboard', exact: true, badge: false, icon: LayoutDashboard }] },
   {
     label: 'Manage',
     links: [
+      { href: '/admin/inspector', label: 'Student Inspector', icon: UserSearch, exact: false, badge: false },
       { href: '/admin/alerts', label: 'Live Alerts', icon: AlertTriangle, exact: false, badge: true },
       { href: '/admin/challenges', label: 'Challenges', icon: BookOpen, exact: false, badge: false },
       { href: '/admin/users', label: 'Users', icon: Users, exact: false, badge: false },

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { AlertTriangle, MessageCircle } from 'lucide-react';
+import { AlertTriangle, MessageCircle, FlaskConical } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAlertsStore } from '@/store/alertsStore';
 import { AdminAlert } from '@/types/admin';
@@ -22,10 +22,12 @@ export default function AdminAlertsPage() {
   const alerts = useAlertsStore((s) => s.alerts);
   const setAlerts = useAlertsStore((s) => s.setAlerts);
   const [selected, setSelected] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
 
   const { data: fetchedAlerts, isLoading } = useQuery<AdminAlert[]>({
     queryKey: ['admin-alerts'],
     queryFn: async () => (await api.get('/admin/alerts')).data,
+    refetchInterval: 10000, // polling safety net alongside the live socket push
   });
 
   useEffect(() => {
@@ -42,13 +44,37 @@ export default function AdminAlertsPage() {
     }
   }
 
+  async function sendTestAlert() {
+    setTesting(true);
+    try {
+      await api.post('/admin/alerts/test');
+      toast.success('Test alert sent — this list should update live within a second or two.');
+      queryClient.invalidateQueries({ queryKey: ['admin-alerts'] });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Could not trigger the test alert.');
+    } finally {
+      setTesting(false);
+    }
+  }
+
   return (
     <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
       <div>
-        <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300">
-          <AlertTriangle size={15} className="text-red-400" />
-          {alerts.length} active alert{alerts.length !== 1 ? 's' : ''}
-        </h2>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300">
+            <AlertTriangle size={15} className="text-red-400" />
+            {alerts.length} active alert{alerts.length !== 1 ? 's' : ''}
+          </h2>
+          <button
+            onClick={sendTestAlert}
+            disabled={testing}
+            title="Verify the full detection → DB → socket → UI pipeline"
+            className="flex flex-shrink-0 items-center gap-1 rounded-full border border-purple-400/30 bg-purple-500/5 px-2.5 py-1 text-[10px] font-bold text-purple-600 hover:bg-purple-500/10 disabled:opacity-40 dark:text-purple-400"
+          >
+            <FlaskConical size={11} />
+            Test
+          </button>
+        </div>
 
         {isLoading && <p className="text-sm text-slate-400">Loading…</p>}
 
@@ -59,9 +85,7 @@ export default function AdminAlertsPage() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               onClick={() => acknowledge(a)}
-              className={`glass flex w-full flex-col gap-1 rounded-2xl p-4 text-left transition-colors ${
-                selected === a.conversationId ? 'ring-2 ring-purple-400' : ''
-              }`}
+              className={`glass flex w-full flex-col gap-1 rounded-2xl p-4 text-left transition-colors ${selected === a.conversationId ? 'ring-2 ring-purple-400' : ''}`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold text-slate-900 dark:text-white">{a.username}</span>
@@ -85,12 +109,7 @@ export default function AdminAlertsPage() {
 
       <AnimatePresence mode="wait">
         {selected ? (
-          <AdminChatPanel
-            key={selected}
-            conversationId={selected}
-            onClose={() => setSelected(null)}
-            onResolved={() => { setSelected(null); queryClient.invalidateQueries({ queryKey: ['admin-alerts'] }); }}
-          />
+          <AdminChatPanel key={selected} conversationId={selected} onClose={() => setSelected(null)} onResolved={() => { setSelected(null); queryClient.invalidateQueries({ queryKey: ['admin-alerts'] }); }} />
         ) : (
           <div className="glass flex h-[calc(100vh-13rem)] flex-col items-center justify-center rounded-3xl text-center">
             <MessageCircle size={32} className="mb-3 text-slate-300 dark:text-slate-600" />

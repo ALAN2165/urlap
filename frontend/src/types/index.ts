@@ -50,7 +50,9 @@ export interface Announcement {
   id: string; titleEn: string; titleAr: string; contentEn: string; contentAr: string;
   type: AnnouncementType; createdAt: string;
 }
-
+export interface InboxMessage {
+  id: string; senderLabel: string; subject: string; body: string; read: boolean; createdAt: string;
+}
 export interface ChatMessageSender { id: string; username: string; role: 'STUDENT' | 'ADMIN'; }
 export interface ChatMessage { id: string; conversationId: string; content: string; createdAt: string; sender: ChatMessageSender; }
 export interface UserConversation {

@@ -10,6 +10,9 @@ import ThemeToggle from './ThemeToggle';
 import LanguageToggle from './LanguageToggle';
 import LogoOrb from '@/components/shared/LogoOrb';
 import { useAuth } from '@/hooks/useAuth';
+import { useQuery } from '@tanstack/react-query';
+import { useUserInboxSocket } from '@/hooks/useUserInboxSocket';
+import { api } from '@/lib/api';
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
@@ -50,7 +53,14 @@ export default function Navbar() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const isAdmin = user?.role === 'ADMIN';
-
+useUserInboxSocket();
+const { data: unread } = useQuery({
+  queryKey: ['inbox-unread'],
+  queryFn: async () => (await api.get('/inbox/unread-count')).data,
+  enabled: !!user,
+  refetchInterval: 30000,
+});
+const unreadCount = unread?.count ?? 0;
   useEffect(() => setMenuOpen(false), [pathname]);
 
   return (
@@ -68,6 +78,14 @@ export default function Navbar() {
           {user && <NavLink href="/announcements" label={t('announcements')} />}
           {user && <NavLink href="/playground" label={t('playground')} />}
           {user && <NavLink href="/profile" label={t('profile')} />}
+          {user && (
+  <Link href="/inbox" className="relative px-4 py-2.5">
+    <span className="text-[15px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">Inbox</span>
+    {unreadCount > 0 && (
+      <span className="absolute -right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">{unreadCount}</span>
+    )}
+  </Link>
+)}
           {isAdmin && (
             <Link href="/admin" className="ml-1">
               <motion.span

@@ -64,7 +64,7 @@ model User {
   username                  String   @unique
   email                     String   @unique
   passwordHash              String
-  avatarUrl                 String?
+  avatarUrl                 String?  @db.Text
   totalPoints               Int      @default(0)
   preferredLang             String   @default("en")
   showInLeaderboard         Boolean  @default(true)
@@ -79,6 +79,7 @@ model User {
   hintUsages       HintUsage[]
   resetTokens      PasswordResetToken[]
   challengeReports ChallengeReport[]
+  inboxMessages    InboxMessage[]
 
   conversationsAsUser  Conversation[] @relation("ConversationsAsUser")
   conversationsAsAdmin Conversation[] @relation("ConversationsAsAdmin")
@@ -224,7 +225,12 @@ model Submission {
   runtimeMs     Int?
   memoryKb      Int?
   pointsAwarded Int              @default(0)
-  createdAt     DateTime         @default(now())
+
+  isPasted         Boolean @default(false)
+  timeSpentSeconds Int?
+  tabSwitches      Int     @default(0)
+
+  createdAt DateTime @default(now())
 
   @@map("submissions")
 }
@@ -263,12 +269,10 @@ model ChallengeReport {
   reason      String    @db.Text
   createdAt   DateTime  @default(now())
 
+  replies InboxMessage[]
+
   @@map("challenge_reports")
 }
-
-// ---------------------------------------------------------------------------
-// Proactive support & live chat
-// ---------------------------------------------------------------------------
 
 model Conversation {
   id          String             @id @default(cuid())
@@ -316,4 +320,19 @@ model Alert {
   resolvedAt     DateTime?
 
   @@map("alerts")
+}
+
+model InboxMessage {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  senderLabel     String           @default("Support Team") // never the real admin username — privacy by design
+  subject         String
+  body            String           @db.Text
+  relatedReportId String?
+  relatedReport   ChallengeReport? @relation(fields: [relatedReportId], references: [id], onDelete: SetNull)
+  read            Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+
+  @@map("inbox_messages")
 }

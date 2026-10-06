@@ -13,7 +13,8 @@ export async function adminGetUsers(req: AuthRequest, res: Response, next: NextF
       orderBy: { createdAt: 'desc' },
       take: 50,
       select: {
-        id: true, username: true, email: true, totalPoints: true, role: true, isBanned: true, createdAt: true,
+        id: true, username: true, totalPoints: true, role: true, isBanned: true, createdAt: true,
+        avatarUrl: true, // was missing — this was the whole admin-side bug
         _count: { select: { solvedChallenges: true } },
       },
     });
@@ -36,7 +37,24 @@ export async function adminSetUserBan(req: AuthRequest, res: Response, next: Nex
   try {
     if (req.params.id === req.userId) return res.status(400).json({ error: 'You cannot ban your own account.' });
     const { isBanned } = banSchema.parse(req.body);
-    const user = await prisma.user.update({ where: { id: req.params.id as string}, data: { isBanned }, select: { id: true, username: true, isBanned: true } });
+    const user = await prisma.user.update({ where: { id: req.params.id as string }, data: { isBanned }, select: { id: true, username: true, isBanned: true } });
     res.json(user);
+  } catch (err) { next(err); }
+}
+
+export async function adminGetUserSubmissions(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const submissions = await prisma.submission.findMany({
+      where: { userId: req.params.id as string },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: {
+        id: true, status: true, code: true, errorMessage: true, actualOutput: true,
+        runtimeMs: true, pointsAwarded: true, createdAt: true,
+        isPasted: true, timeSpentSeconds: true, tabSwitches: true,
+        challenge: { select: { titleEn: true, slug: true } },
+      },
+    });
+    res.json(submissions);
   } catch (err) { next(err); }
 }
