@@ -1,14 +1,9 @@
 {
   "pages": {
-    "/admin/alerts/page": [
+    "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/alerts/page.js"
-    ],
-    "/admin/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/admin/layout.js"
+      "static/chunks/app/page.js"
     ],
     "/layout": [
       "static/chunks/webpack.js",
@@ -21,45 +16,75 @@
       "static/chunks/main-app.js",
       "static/chunks/app/template.js"
     ],
-    "/page": [
+    "/admin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
+      "static/chunks/app/admin/page.js"
+    ],
+    "/admin/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/layout.js"
+    ],
+    "/admin/template": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/template.js"
+    ],
+    "/(auth)/login/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(auth)/login/page.js"
+    ],
+    "/(auth)/template": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(auth)/template.js"
     ],
     "/(main)/dashboard/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(main)/dashboard/page.js"
     ],
-    "/(main)/inbox/page": [
+    "/(main)/template": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(main)/inbox/page.js"
+      "static/chunks/app/(main)/template.js"
     ],
-    "/(main)/profile/page": [
+    "/(main)/challenges/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(main)/profile/page.js"
+      "static/chunks/app/(main)/challenges/page.js"
     ],
-    "/admin/page": [
+    "/(main)/playground/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/page.js"
+      "static/chunks/app/(main)/playground/page.js"
+    ],
+    "/(main)/announcements/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(main)/announcements/page.js"
+    ],
+    "/(main)/leaderboard/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(main)/leaderboard/page.js"
     ],
     "/admin/inspector/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/admin/inspector/page.js"
     ],
-    "/admin/reports/page": [
+    "/admin/alerts/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/admin/reports/page.js"
+      "static/chunks/app/admin/alerts/page.js"
     ],
-    "/(main)/challenges/page": [
+    "/(main)/inbox/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(main)/challenges/page.js"
+      "static/chunks/app/(main)/inbox/page.js"
     ],
     "/(main)/challenges/[labSlug]/page": [
       "static/chunks/webpack.js",
@@ -70,6 +95,11 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(main)/challenges/[labSlug]/[challengeSlug]/page.js"
+    ],
+    "/admin/reports/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/reports/page.js"
     ]
   }
 }

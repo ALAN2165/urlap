@@ -1,10 +1,9 @@
 {
-  "/(main)/inbox/page": "app/(main)/inbox/page.js",
-  "/page": "app/page.js",
-  "/(main)/challenges/[labSlug]/[challengeSlug]/page": "app/(main)/challenges/[labSlug]/[challengeSlug]/page.js",
-  "/(main)/challenges/[labSlug]/page": "app/(main)/challenges/[labSlug]/page.js",
   "/(main)/challenges/page": "app/(main)/challenges/page.js",
+  "/(main)/challenges/[labSlug]/[challengeSlug]/page": "app/(main)/challenges/[labSlug]/[challengeSlug]/page.js",
+  "/page": "app/page.js",
+  "/(main)/inbox/page": "app/(main)/inbox/page.js",
+  "/(main)/playground/page": "app/(main)/playground/page.js",
   "/admin/page": "app/admin/page.js",
-  "/admin/reports/page": "app/admin/reports/page.js",
-  "/admin/inspector/page": "app/admin/inspector/page.js"
+  "/admin/reports/page": "app/admin/reports/page.js"
 }

@@ -9,9 +9,7 @@ import {
 } from '../validators/adminChallenge.validator';
 
 function slugify(text: string): string {
-  return (
-    text.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 40) || 'item'
-  );
+  return text.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 40) || 'item';
 }
 
 export async function adminGetLabs(req: AuthRequest, res: Response, next: NextFunction) {
@@ -42,16 +40,18 @@ export async function adminCreateLab(req: AuthRequest, res: Response, next: Next
 
 export async function adminUpdateLab(req: AuthRequest, res: Response, next: NextFunction) {
   try {
+    const id = req.params.id as string;
     const data = adminLabSchema.parse(req.body);
-    const lab = await prisma.lab.update({ where: { id: req.params.id as string }, data: { titleEn: data.titleEn, titleAr: data.titleAr } });
+    const lab = await prisma.lab.update({ where: { id }, data: { titleEn: data.titleEn, titleAr: data.titleAr } });
     res.json(lab);
   } catch (err) { next(err); }
 }
 
 export async function adminGetChallenge(req: AuthRequest, res: Response, next: NextFunction) {
   try {
+    const id = req.params.id as string;
     const challenge = await prisma.challenge.findUniqueOrThrow({
-      where: { id: req.params.id as string},
+      where: { id },
       include: { hints: { orderBy: { order: 'asc' } } },
     });
     res.json(challenge);
@@ -61,7 +61,6 @@ export async function adminGetChallenge(req: AuthRequest, res: Response, next: N
 export async function adminCreateChallenge(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const data = adminCreateChallengeSchema.parse(req.body);
-
     if (data.schemaJson) {
       try { JSON.parse(data.schemaJson); } catch { return res.status(400).json({ error: 'Schema JSON is not valid JSON.' }); }
     }
@@ -84,9 +83,15 @@ export async function adminCreateChallenge(req: AuthRequest, res: Response, next
         labId: data.labId,
         schemaJson: data.schemaJson || null,
         referenceAnswer: data.referenceAnswer,
+        verificationQuery: data.verificationQuery || null,
         starterCodes: { create: [{ language: 'SQL', code: '-- write your SQL query here\n' }] },
         hints: {
-          create: data.hints.map((h, i) => ({ order: i + 1, contentEn: h.contentEn, contentAr: h.contentAr, pointPenalty: h.pointPenalty })),
+          create: data.hints.map((h, i) => ({
+            order: i + 1,
+            contentEn: h.contentEn,
+            contentAr: h.contentAr,
+            pointPenalty: h.pointPenalty,
+          })),
         },
       },
     });
@@ -96,16 +101,16 @@ export async function adminCreateChallenge(req: AuthRequest, res: Response, next
 
 export async function adminUpdateChallenge(req: AuthRequest, res: Response, next: NextFunction) {
   try {
+    const id = req.params.id as string;
     const data = adminUpdateChallengeSchema.parse(req.body);
-
     if (data.schemaJson) {
       try { JSON.parse(data.schemaJson); } catch { return res.status(400).json({ error: 'Schema JSON is not valid JSON.' }); }
     }
 
     await prisma.$transaction([
-      prisma.hint.deleteMany({ where: { challengeId: req.params.id as string} }),
+      prisma.hint.deleteMany({ where: { challengeId: id } }),
       prisma.challenge.update({
-        where: { id: req.params.id as string },
+        where: { id },
         data: {
           titleEn: data.titleEn,
           titleAr: data.titleAr,
@@ -115,15 +120,21 @@ export async function adminUpdateChallenge(req: AuthRequest, res: Response, next
           points: data.points,
           schemaJson: data.schemaJson || null,
           referenceAnswer: data.referenceAnswer,
+          verificationQuery: data.verificationQuery || null,
           hints: {
-            create: data.hints.map((h, i) => ({ order: i + 1, contentEn: h.contentEn, contentAr: h.contentAr, pointPenalty: h.pointPenalty })),
+            create: data.hints.map((h, i) => ({
+              order: i + 1,
+              contentEn: h.contentEn,
+              contentAr: h.contentAr,
+              pointPenalty: h.pointPenalty,
+            })),
           },
         },
       }),
     ]);
 
     const updated = await prisma.challenge.findUniqueOrThrow({
-      where: { id: req.params.id as string },
+      where: { id },
       include: { hints: { orderBy: { order: 'asc' } } },
     });
     res.json(updated);
@@ -132,7 +143,8 @@ export async function adminUpdateChallenge(req: AuthRequest, res: Response, next
 
 export async function adminDeleteChallenge(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    await prisma.challenge.delete({ where: { id: req.params.id as string} });
+    const id = req.params.id as string;
+    await prisma.challenge.delete({ where: { id } });
     res.status(204).send();
   } catch (err) { next(err); }
 }
@@ -141,7 +153,7 @@ export async function adminReorderChallenges(req: AuthRequest, res: Response, ne
   try {
     const { challengeIds } = adminReorderSchema.parse(req.body);
     await prisma.$transaction(
-      challengeIds.map((id, index) => prisma.challenge.update({ where: { id }, data: { orderIndex: index } }))
+      challengeIds.map((cid, index) => prisma.challenge.update({ where: { id: cid }, data: { orderIndex: index } }))
     );
     res.json({ ok: true });
   } catch (err) { next(err); }

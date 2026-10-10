@@ -1,21 +1,19 @@
 'use client';
 
 import { useEffect } from 'react';
-import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSocket } from './useSocket';
 import { ChatMessage } from '@/types';
 
-export function useUserInboxSocket() {
+export function useUserConversationsSocket() {
   const socket = useSocket();
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!socket) return;
     function handleNewMessage(payload: ChatMessage) {
-      if (payload.sender.role !== 'ADMIN') return;
-      toast('New message from Support Team');
-      queryClient.invalidateQueries({ queryKey: ['inbox-unread'] });
+      queryClient.invalidateQueries({ queryKey: ['my-conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['my-conversation', payload.conversationId] });
     }
     socket.on('message:new', handleNewMessage);
     return () => { socket.off('message:new', handleNewMessage); };

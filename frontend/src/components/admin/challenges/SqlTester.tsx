@@ -10,9 +10,10 @@ import CodeEditor from '@/components/editor/CodeEditor';
 interface Props {
   value: string;
   onChange: (v: string) => void;
+  label?: string;
 }
 
-export default function SqlTester({ value, onChange }: Props) {
+export default function SqlTester({ value, onChange, label = 'Reference Answer (SQL)' }: Props) {
   const [result, setResult] = useState<SqlTestResult | null>(null);
   const [testing, setTesting] = useState(false);
 
@@ -32,13 +33,8 @@ export default function SqlTester({ value, onChange }: Props) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Reference Answer (SQL)</label>
-        <button
-          type="button"
-          onClick={runTest}
-          disabled={testing || !value.trim()}
-          className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-purple-600 to-purple-800 px-4 py-1.5 text-xs font-bold text-white shadow-[0_0_14px_rgba(147,51,234,0.3)] disabled:opacity-50"
-        >
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</label>
+        <button type="button" onClick={runTest} disabled={testing || !value.trim()} className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-purple-600 to-purple-800 px-4 py-1.5 text-xs font-bold text-white shadow-[0_0_14px_rgba(147,51,234,0.3)] disabled:opacity-50">
           {testing ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
           Test Query
         </button>
@@ -56,21 +52,11 @@ export default function SqlTester({ value, onChange }: Props) {
           {result.columns.length > 0 && (
             <div dir="ltr" className="scroll-thin max-h-56 overflow-auto">
               <table className="w-full border-collapse text-left font-mono text-xs">
-                <thead>
-                  <tr>
-                    {result.columns.map((c, i) => (
-                      <th key={i} className="whitespace-nowrap border-b border-slate-200 bg-slate-50 px-3 py-1.5 font-semibold text-purple-700 dark:border-slate-700/50 dark:bg-slate-800 dark:text-purple-300">{c}</th>
-                    ))}
-                  </tr>
-                </thead>
+                <thead><tr>{result.columns.map((c, i) => <th key={i} className="whitespace-nowrap border-b border-slate-200 bg-slate-50 px-3 py-1.5 font-semibold text-purple-700 dark:border-slate-700/50 dark:bg-slate-800 dark:text-purple-300">{c}</th>)}</tr></thead>
                 <tbody>
                   {result.rows.map((row, ri) => (
                     <tr key={ri} className="border-b border-slate-100 even:bg-slate-50/50 dark:border-slate-800/60 dark:even:bg-slate-800/20">
-                      {row.map((cell, ci) => (
-                        <td key={ci} className="whitespace-nowrap px-3 py-1.5 text-slate-700 dark:text-slate-300">
-                          {cell === null ? <span className="italic text-slate-400">NULL</span> : String(cell)}
-                        </td>
-                      ))}
+                      {row.map((cell, ci) => <td key={ci} className="whitespace-nowrap px-3 py-1.5 text-slate-700 dark:text-slate-300">{cell === null ? <span className="italic text-slate-400">NULL</span> : String(cell)}</td>)}
                     </tr>
                   ))}
                 </tbody>

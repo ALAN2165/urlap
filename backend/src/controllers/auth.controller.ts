@@ -1,10 +1,8 @@
-import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import { registerSchema, loginSchema } from '../validators/auth.validator';
 import { updateProfileSchema } from '../validators/profile.validator';
 import { registerUser, loginUser } from '../services/auth.service';
 import { prisma } from '../config/db';
-import { AuthRequest } from '../middleware/authMiddleware';
 
 const PROFILE_SELECT = {
   id: true, username: true, email: true, avatarUrl: true,
@@ -12,7 +10,7 @@ const PROFILE_SELECT = {
   receiveAnnouncementEmails: true, role: true, createdAt: true,
 };
 
-export async function register(req: Request, res: Response, next: NextFunction) {
+export async function register(req: any, res: any, next: any) {
   try {
     const { username, email, password } = registerSchema.parse(req.body);
     const result = await registerUser(username, email, password);
@@ -20,7 +18,7 @@ export async function register(req: Request, res: Response, next: NextFunction) 
   } catch (err) { next(err); }
 }
 
-export async function login(req: Request, res: Response, next: NextFunction) {
+export async function login(req: any, res: any, next: any) {
   try {
     const { email, password } = loginSchema.parse(req.body);
     const result = await loginUser(email, password);
@@ -28,14 +26,14 @@ export async function login(req: Request, res: Response, next: NextFunction) {
   } catch (err) { next(err); }
 }
 
-export async function me(req: AuthRequest, res: Response, next: NextFunction) {
+export async function me(req: any, res: any, next: any) {
   try {
     const user = await prisma.user.findUniqueOrThrow({ where: { id: req.userId }, select: PROFILE_SELECT });
     res.json(user);
   } catch (err) { next(err); }
 }
 
-export async function stats(req: AuthRequest, res: Response, next: NextFunction) {
+export async function stats(req: any, res: any, next: any) {
   try {
     const mine = await prisma.user.findUniqueOrThrow({ where: { id: req.userId }, select: { totalPoints: true } });
     const [higherRanked, totalUsers, solvedChallenges, totalChallenges, acceptedSubmissions, gradedSubmissions] = await Promise.all([
@@ -55,7 +53,7 @@ export async function stats(req: AuthRequest, res: Response, next: NextFunction)
   } catch (err) { next(err); }
 }
 
-export async function updateProfile(req: AuthRequest, res: Response, next: NextFunction) {
+export async function updateProfile(req: any, res: any, next: any) {
   try {
     const { username, password, showInLeaderboard, receiveAnnouncementEmails } = updateProfileSchema.parse(req.body);
     const data: {

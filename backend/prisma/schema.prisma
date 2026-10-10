@@ -79,7 +79,6 @@ model User {
   hintUsages       HintUsage[]
   resetTokens      PasswordResetToken[]
   challengeReports ChallengeReport[]
-  inboxMessages    InboxMessage[]
 
   conversationsAsUser  Conversation[] @relation("ConversationsAsUser")
   conversationsAsAdmin Conversation[] @relation("ConversationsAsAdmin")
@@ -139,6 +138,13 @@ model Challenge {
 
   schemaJson      String?    @db.Text
   referenceAnswer String?    @db.Text
+
+  // When set, this challenge is graded by DATABASE STATE rather than
+  // SELECT output: referenceAnswer holds the correct DML (INSERT/UPDATE/
+  // DELETE), and verificationQuery is run (after the student's statement,
+  // and separately after the reference's) to capture the resulting state
+  // for comparison. Null for ordinary SELECT challenges.
+  verificationQuery String? @db.Text
 
   labId      String?
   lab        Lab?      @relation(fields: [labId], references: [id])
@@ -269,8 +275,6 @@ model ChallengeReport {
   reason      String    @db.Text
   createdAt   DateTime  @default(now())
 
-  replies InboxMessage[]
-
   @@map("challenge_reports")
 }
 
@@ -320,19 +324,4 @@ model Alert {
   resolvedAt     DateTime?
 
   @@map("alerts")
-}
-
-model InboxMessage {
-  id              String           @id @default(cuid())
-  userId          String
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  senderLabel     String           @default("Support Team") // never the real admin username — privacy by design
-  subject         String
-  body            String           @db.Text
-  relatedReportId String?
-  relatedReport   ChallengeReport? @relation(fields: [relatedReportId], references: [id], onDelete: SetNull)
-  read            Boolean          @default(false)
-  createdAt       DateTime         @default(now())
-
-  @@map("inbox_messages")
 }

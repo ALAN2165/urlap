@@ -1,5 +1,5 @@
 'use client';
-
+import { useChallengeChatLifecycle } from '@/hooks/useChallengeChatLifecycle';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -29,10 +29,11 @@ export default function ChallengeSolvePage() {
   const queryClient = useQueryClient();
   const setUser = useAuthStore((s) => s.setUser);
 
-  const { data: challenge, isError } = useQuery<ChallengeDetail>({
+ const { data: challenge, isError } = useQuery<ChallengeDetail>({
     queryKey: ['challenge', challengeSlug],
     queryFn: async () => (await api.get(`/challenges/${challengeSlug}`)).data,
   });
+  useChallengeChatLifecycle(challenge?.id);
 
   const { data: lab } = useQuery<LabDetail>({
     queryKey: ['lab', labSlug],

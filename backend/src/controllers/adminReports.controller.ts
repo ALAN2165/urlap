@@ -13,13 +13,13 @@ export async function adminGetReports(req: AuthRequest, res: Response, next: Nex
         id: true, reason: true, createdAt: true,
         user: { select: { username: true } },
         challenge: { select: { titleEn: true, slug: true } },
-        _count: { select: { replies: true } },
+        // تم إزالة _count لارتباطها بنظام الرسائل القديم المحذوف
       },
     });
     res.json(reports.map((r: any) => ({
       id: r.id, reason: r.reason, createdAt: r.createdAt,
-      username: r.user.username, challengeTitle: r.challenge.titleEn, challengeSlug: r.challenge.slug,
-      replied: r._count?.replies > 0,
+      username: r.user?.username, challengeTitle: r.challenge?.titleEn, challengeSlug: r.challenge?.slug,
+      replied: false, // قيمة افتراضية لضمان عمل الواجهة الأمامية بدون مشاكل
     })));
   } catch (err) { next(err); }
 }
@@ -43,17 +43,12 @@ export async function adminReplyToReport(req: AuthRequest, res: Response, next: 
 
     const challengeTitle = (report as any).challenge?.titleEn || 'Challenge';
 
-    const inboxMessage = await prisma.inboxMessage.create({
-      data: {
-        userId: report.userId,
-        senderLabel: 'Support Team', // intentionally never the admin's real username
-        subject: `Re: your report on "${challengeTitle}"`,
-        body: message,
-        relatedReportId: report.id,
-      },
+    // تم استبدال الحفظ في قاعدة البيانات القديمة بإرسال إشعار لحظي بالسوكيت
+    emitToUser(report.userId, 'alert', { 
+      type: 'info',
+      title: `Re: your report on "${challengeTitle}"`, 
+      message: message 
     });
-
-    emitToUser(report.userId, 'inbox:new', { id: inboxMessage.id, subject: inboxMessage.subject, createdAt: inboxMessage.createdAt });
 
     res.status(201).json({ message: 'Reply sent.' });
   } catch (err) { next(err); }
