@@ -11,25 +11,30 @@ import adminRoutes from './routes/admin.routes';
 import playgroundRoutes from './routes/playground.routes';
 import reportRoutes from './routes/report.routes';
 import conversationRoutes from './routes/conversation.routes';
-import inboxRoutes from './routes/inbox.routes';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
-const allowedOrigins: string[] = (process.env.FRONTEND_URL || 'http://localhost:3000')
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+  .replace(/['"]/g, '') 
   .split(',')
-  .map((s: string) => s.trim())
+  .map((s) => s.trim().replace(/\/$/, '')) 
   .filter(Boolean);
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
-    else callback(new Error('Not allowed by CORS'));
+    const cleanOrigin = origin ? origin.replace(/\/$/, '') : '';
+    if (!origin || allowedOrigins.includes(cleanOrigin)) {
+      callback(null, true);
+    } else {
+      console.error(`[CORS Blocked] Origin received: '${origin}' | Allowed list:`, allowedOrigins);
+      callback(new Error('Not allowed by CORS'));
+    }
   },
 };
 
 app.use(helmet());
-app.use(cors(corsOptions)); // also answers OPTIONS preflight for every route
+app.use(cors(corsOptions));
 app.use(morgan('dev'));
 app.use(express.json());
 
@@ -42,7 +47,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/playground', playgroundRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/conversations', conversationRoutes);
-app.use('/api/inbox', inboxRoutes);
 
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' });
