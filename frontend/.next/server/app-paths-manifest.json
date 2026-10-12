@@ -1,9 +1,4 @@
 {
-  "/(main)/challenges/page": "app/(main)/challenges/page.js",
-  "/(main)/challenges/[labSlug]/[challengeSlug]/page": "app/(main)/challenges/[labSlug]/[challengeSlug]/page.js",
-  "/page": "app/page.js",
-  "/(main)/inbox/page": "app/(main)/inbox/page.js",
-  "/(main)/playground/page": "app/(main)/playground/page.js",
-  "/admin/page": "app/admin/page.js",
-  "/admin/reports/page": "app/admin/reports/page.js"
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/page": "app/page.js"
 }

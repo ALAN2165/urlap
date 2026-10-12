@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import LiquidBar from './liquid/LiquidBar';
 
 export interface RankedItem {
   label: string;
@@ -10,7 +10,7 @@ export interface RankedItem {
 
 interface Props {
   items: RankedItem[];
-  color: string;
+  color: string; // 6-digit hex
   valueSuffix?: string;
   twoColumn?: boolean;
   emptyLabel?: string;
@@ -24,34 +24,20 @@ export default function RankedBarList({ items, color, valueSuffix = '', twoColum
   const max = Math.max(...items.map((i) => i.value), 1);
 
   return (
-    <ul className={twoColumn ? 'grid gap-x-12 gap-y-6 lg:grid-cols-2' : 'space-y-6'}>
-      {items.map((item, i) => {
-        const pct = Math.max((item.value / max) * 100, 4);
-        return (
-          <li key={`${item.label}-${i}`}>
-            <div className="mb-2 flex items-baseline justify-between gap-4">
-              <span className="min-w-0 break-words text-sm font-medium leading-snug text-slate-800 dark:text-slate-200">
-                {item.label}
-              </span>
-              <span dir="ltr" className="flex-shrink-0 font-mono text-sm font-bold" style={{ color }}>
-                {item.value}
-                {valueSuffix}
-              </span>
-            </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-slate-200/70 dark:bg-slate-800/70">
-              <motion.div
-                className="h-full rounded-full"
-                style={{ background: `linear-gradient(90deg, ${color}, ${color}99)` }}
-                initial={{ width: 0 }}
-                whileInView={{ width: `${pct}%` }}
-                viewport={{ once: true, amount: 0.5 }}
-                transition={{ duration: 0.8, delay: i * 0.06, ease: 'easeOut' }}
-              />
-            </div>
-            {item.detail && <div className="mt-1.5 text-[11px] text-slate-400 dark:text-slate-500">{item.detail}</div>}
-          </li>
-        );
-      })}
+    <ul className={twoColumn ? 'grid gap-x-12 gap-y-7 lg:grid-cols-2' : 'space-y-7'}>
+      {items.map((item, i) => (
+        <li key={`${item.label}-${i}`}>
+          <div className="mb-2.5 flex items-baseline justify-between gap-4">
+            <span className="min-w-0 break-words text-sm font-medium leading-snug text-slate-800 dark:text-slate-200">{item.label}</span>
+            <span dir="ltr" className="flex-shrink-0 font-mono text-sm font-bold" style={{ color }}>
+              {item.value}
+              {valueSuffix}
+            </span>
+          </div>
+          <LiquidBar pct={(item.value / max) * 100} color={color} delay={i * 0.08} />
+          {item.detail && <div className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">{item.detail}</div>}
+        </li>
+      ))}
     </ul>
   );
 }

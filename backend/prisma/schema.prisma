@@ -60,19 +60,19 @@ enum AlertStatus {
 }
 
 model User {
-  id                        String   @id @default(cuid())
-  username                  String   @unique
-  email                     String   @unique
-  passwordHash              String
-  avatarUrl                 String?  @db.Text
-  totalPoints               Int      @default(0)
-  preferredLang             String   @default("en")
-  showInLeaderboard         Boolean  @default(true)
+  id                      String   @id @default(cuid())
+  username                String   @unique
+  email                   String   @unique
+  passwordHash            String
+  avatarUrl               String?  @db.Text
+  totalPoints             Int      @default(0)
+  preferredLang           String   @default("en")
+  showInLeaderboard       Boolean  @default(true)
   receiveAnnouncementEmails Boolean  @default(false)
-  role                      Role     @default(STUDENT)
-  isBanned                  Boolean  @default(false)
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  role                    Role     @default(STUDENT)
+  isBanned                Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   submissions      Submission[]
   solvedChallenges ChallengeCompletion[]
@@ -167,11 +167,11 @@ model Challenge {
 }
 
 model StarterCode {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   challengeId String
   challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
   language    Language
-  code        String    @db.Text
+  code        String   @db.Text
 
   @@unique([challengeId, language])
   @@map("starter_codes")
@@ -217,20 +217,20 @@ model HintUsage {
 }
 
 model Submission {
-  id            String           @id @default(cuid())
-  userId        String
-  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  challengeId   String
-  challenge     Challenge        @relation(fields: [challengeId], references: [id], onDelete: Cascade)
-  language      Language
-  code          String           @db.Text
-  status        SubmissionStatus @default(PENDING)
-  actualOutput  String?          @db.Text
-  errorMessage  String?          @db.Text
-  resultJson    String?          @db.Text
-  runtimeMs     Int?
-  memoryKb      Int?
-  pointsAwarded Int              @default(0)
+  id             String           @id @default(cuid())
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  challengeId    String
+  challenge      Challenge        @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  language       Language
+  code           String           @db.Text
+  status         SubmissionStatus @default(PENDING)
+  actualOutput   String?          @db.Text
+  errorMessage   String?          @db.Text
+  resultJson     String?          @db.Text
+  runtimeMs      Int?
+  memoryKb       Int?
+  pointsAwarded  Int              @default(0)
 
   isPasted         Boolean @default(false)
   timeSpentSeconds Int?

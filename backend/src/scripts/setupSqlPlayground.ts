@@ -5,6 +5,7 @@ const GRADER_PASSWORD = process.env.SQL_GRADER_PASSWORD || 'urlap_grader_pw_chan
 
 async function main() {
   const admin = new Pool({ connectionString: process.env.DATABASE_URL });
+  const dbName = new URL(process.env.DATABASE_URL || '').pathname.replace('/', '');
 
   console.log('🔧 Setting up SQL playground schema, role, and grants...');
 
@@ -22,6 +23,8 @@ async function main() {
 
   await admin.query(`CREATE SCHEMA IF NOT EXISTS playground;`);
   await admin.query(`DROP TABLE IF EXISTS playground.employees;`);
+  await admin.query(`DROP TABLE IF EXISTS playground.departments;`);
+
   await admin.query(`
     CREATE TABLE playground.employees (
       employee_id     INTEGER PRIMARY KEY,
@@ -35,27 +38,43 @@ async function main() {
     );
   `);
 
+  await admin.query(`
+    CREATE TABLE playground.departments (
+      department_id    INTEGER PRIMARY KEY,
+      department_name VARCHAR(30) NOT NULL,
+      manager_id       INTEGER,
+      location_id      INTEGER
+    );
+  `);
+
   await admin.query(`REVOKE ALL ON SCHEMA public FROM urlap_grader;`);
   await admin.query(`REVOKE ALL ON ALL TABLES IN SCHEMA public FROM urlap_grader;`);
   await admin.query(`GRANT USAGE ON SCHEMA playground TO urlap_grader;`);
+
+  // READ-ONLY on the real tables, on purpose. Every grading run copies these tables into
+  // private TEMP tables and executes the student's SQL against the copies, so INSERT / UPDATE /
+  // DELETE can never touch the real data, even if a transaction were somehow committed.
   await admin.query(`GRANT SELECT ON ALL TABLES IN SCHEMA playground TO urlap_grader;`);
   await admin.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA playground GRANT SELECT ON TABLES TO urlap_grader;`);
+
   await admin.query(`ALTER ROLE urlap_grader SET search_path = playground;`);
   await admin.query(`ALTER ROLE urlap_grader SET statement_timeout = '8000';`);
   await admin.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC;`);
-  await admin.query(`REVOKE TEMP ON DATABASE ${new URL(process.env.DATABASE_URL || '').pathname.replace('/', '')} FROM urlap_grader;`);
+  await admin.query(`GRANT TEMP ON DATABASE "${dbName}" TO urlap_grader;`);
   await admin.query(`GRANT CREATE ON SCHEMA playground TO urlap_grader;`);
   try {
     await admin.query(`GRANT USAGE ON LANGUAGE plpgsql TO urlap_grader;`);
   } catch (err) {
     console.warn('  (non-fatal) could not grant plpgsql usage:', (err as Error).message);
   }
+  try {
+    await admin.query(`ALTER ROLE urlap_grader SET temp_file_limit = '64MB';`);
+  } catch (err) {
+    console.warn('  (non-fatal) could not set temp_file_limit (needs superuser):', (err as Error).message);
+  }
 
   console.log('🧩 Installing SQL compatibility helper functions (NVL, NVL2, DECODE, date/string helpers)...');
 
-  // Drop the old generic/polymorphic versions from earlier — they're the
-  // actual root cause of "NVL fails with a literal argument". Concrete
-  // per-type overloads below replace them.
   await admin.query(`DROP FUNCTION IF EXISTS playground.nvl(anyelement, anyelement);`);
   await admin.query(`DROP FUNCTION IF EXISTS playground.nvl2(anyelement, anyelement, anyelement);`);
 
@@ -71,10 +90,6 @@ async function main() {
   await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl2(anyelement, integer, integer) RETURNS integer AS $$ SELECT CASE WHEN $1 IS NOT NULL THEN $2 ELSE $3 END; $$ LANGUAGE sql IMMUTABLE;`);
   await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl2(anyelement, numeric, numeric) RETURNS numeric AS $$ SELECT CASE WHEN $1 IS NOT NULL THEN $2 ELSE $3 END; $$ LANGUAGE sql IMMUTABLE;`);
 
-  // DECODE(expr, search1, result1, [search2, result2, ...], [default]).
-  // Caveat: all arguments must share one common type (a Postgres array
-  // constraint) — covers the common case (e.g. all-text comparisons/results)
-  // but not Oracle's more permissive implicit mixed-type coercion.
   await admin.query(`
     CREATE OR REPLACE FUNCTION playground.decode(VARIADIC args anyarray)
     RETURNS anyelement AS $$
@@ -105,7 +120,7 @@ async function main() {
   await admin.query(`GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA playground TO urlap_grader;`);
   await admin.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA playground GRANT EXECUTE ON FUNCTIONS TO urlap_grader;`);
 
-  console.log('🌱 Inserting dummy employee rows...');
+  console.log('🌱 Inserting dummy rows...');
 
   await admin.query(`
     INSERT INTO playground.employees
@@ -137,10 +152,26 @@ async function main() {
       (123, 'Sandoval',  'SA_REP',     6800, '2018-08-08', NULL, 105, 30),
       (124, 'Bautista',  'HR_REP',     7800, '2022-04-04', NULL, 100, 10),
       (125, 'Fenn',      'SA_REP',     9900, '2017-02-20', 0.05, 105, 30),
-      (126, 'Higgins',   'FI_MGR',    15000, '2015-06-15', NULL, 100, 20);
+      (126, 'Higgins',   'FI_MGR',    15000, '2015-06-15', NULL, 100, 20),
+      (141, 'Rajs',      'ST_CLERK',   3500, '2018-04-17', NULL, 106, 40),
+      (143, 'Matos',     'ST_CLERK',   2600, '2021-03-15', NULL, 106, 40);
   `);
 
-  console.log('✅ SQL playground ready: schema, table, role, grants, compatibility functions, and 27 rows.');
+  // Department 30 is intentionally absent: Lab 3 Challenge 1 inserts it.
+  // Departments 70 and 80 intentionally have no employees: Lab 3 Challenge 6 (outer join) needs them.
+  await admin.query(`
+    INSERT INTO playground.departments (department_id, department_name, manager_id, location_id)
+    VALUES
+      (10, 'Administration',  100, 1700),
+      (20, 'Finance',         101, 1700),
+      (40, 'Shipping',        106, 1500),
+      (50, 'IT',              118, 1400),
+      (60, 'Supply Chain',    119, 1700),
+      (70, 'Public Relations', NULL, 2700),
+      (80, 'Marketing',        NULL, 1800);
+  `);
+
+  console.log('✅ SQL playground ready: 29 employees, 7 departments, read-only grants, compatibility functions.');
   await admin.end();
 }
 

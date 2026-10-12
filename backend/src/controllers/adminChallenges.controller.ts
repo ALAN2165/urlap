@@ -83,7 +83,6 @@ export async function adminCreateChallenge(req: AuthRequest, res: Response, next
         labId: data.labId,
         schemaJson: data.schemaJson || null,
         referenceAnswer: data.referenceAnswer,
-        verificationQuery: data.verificationQuery || null,
         starterCodes: { create: [{ language: 'SQL', code: '-- write your SQL query here\n' }] },
         hints: {
           create: data.hints.map((h, i) => ({
@@ -120,7 +119,6 @@ export async function adminUpdateChallenge(req: AuthRequest, res: Response, next
           points: data.points,
           schemaJson: data.schemaJson || null,
           referenceAnswer: data.referenceAnswer,
-          verificationQuery: data.verificationQuery || null,
           hints: {
             create: data.hints.map((h, i) => ({
               order: i + 1,
