@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { wavePath, waveLine } from './wave';
+import { wavePath, waveLine } from './waveUtils';
 
 interface WaveProps {
   amp: number;
