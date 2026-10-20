@@ -3,7 +3,7 @@
 import { Fragment } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { Lock, Crown, Flame, Sparkles } from 'lucide-react';
+import { Lock, Crown, Sparkles } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { PathChallenge } from '@/types';
 
@@ -25,7 +25,7 @@ const WIRE_COLOR: Record<WireState, string> = {
   done: '#10b981',
   active: '#a855f7',
   future: '#64748b',
-  master: '#f59e0b',
+  master: '#d97706',
 };
 
 function Wire({ state, direction }: { state: WireState; direction: 'right' | 'left' | 'down' }) {
@@ -47,53 +47,19 @@ function Wire({ state, direction }: { state: WireState; direction: 'right' | 'le
             state === 'future'
               ? `repeating-linear-gradient(45deg, ${color}66 0 4px, transparent 4px 8px)`
               : state === 'master'
-                ? 'linear-gradient(90deg, #f59e0b, #ef4444, #a855f7)'
+                ? 'linear-gradient(90deg, #d97706, #b45309, #78350f)'
                 : color,
           opacity: state === 'future' ? 0.55 : state === 'done' || state === 'master' ? 0.95 : 0.3,
-          boxShadow: state === 'master' ? '0 0 14px rgba(245,158,11,0.75)' : undefined,
+          boxShadow: state === 'master' ? '0 0 10px rgba(217,119,6,0.5)' : undefined,
         }}
       />
 
-      {(state === 'active' || state === 'master') &&
-        [0, 1, 2].map((i) => (
-          <motion.span
-            key={i}
-            className="absolute h-[8px] w-[8px] rounded-full"
-            style={{
-              backgroundColor: state === 'master' ? '#fde047' : color,
-              boxShadow:
-                state === 'master'
-                  ? '0 0 12px 4px #f59e0b, 0 0 20px 6px #ef4444'
-                  : `0 0 8px 2px ${color}`,
-              ...(vertical ? { left: '50%', marginLeft: -4 } : { top: '50%', marginTop: -4 }),
-            }}
-            animate={
-              vertical
-                ? { top: ['-4%', '104%'], opacity: [0, 1, 1, 0] }
-                : { left: ['-4%', '104%'], opacity: [0, 1, 1, 0] }
-            }
-            transition={{
-              duration: state === 'master' ? 0.75 : 1.1,
-              repeat: Infinity,
-              ease: 'linear',
-              delay: i * (state === 'master' ? 0.24 : 0.35),
-            }}
-          />
-        ))}
-
-      {state === 'done' && (
+      {state === 'master' && (
         <motion.span
-          className="absolute h-2.5 w-2.5 rounded-full"
-          style={{
-            left: '50%',
-            top: '50%',
-            marginLeft: -5,
-            marginTop: -5,
-            backgroundColor: color,
-            boxShadow: `0 0 10px 3px ${color}`,
-          }}
-          animate={{ opacity: [0.5, 1, 0.5], scale: [0.85, 1.2, 0.85] }}
-          transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute h-[6px] w-[6px] rounded-full bg-amber-300 shadow-[0_0_8px_#fbbf24]"
+          style={{ ...(vertical ? { left: '50%', marginLeft: -3 } : { top: '50%', marginTop: -3 }) }}
+          animate={vertical ? { top: ['0%', '100%'] } : { left: ['0%', '100%'] }}
+          transition={{ duration: 1.8, repeat: Infinity, ease: 'linear' }}
         />
       )}
 
@@ -107,7 +73,6 @@ function Wire({ state, direction }: { state: WireState; direction: 'right' | 'le
           borderColor: color,
           backgroundColor: state === 'future' ? 'transparent' : color,
           opacity: state === 'future' ? 0.45 : 1,
-          boxShadow: state === 'future' ? undefined : `0 0 6px ${color}`,
         }}
       />
       <span
@@ -120,7 +85,6 @@ function Wire({ state, direction }: { state: WireState; direction: 'right' | 'le
           borderColor: color,
           backgroundColor: state === 'future' ? 'transparent' : color,
           opacity: state === 'future' ? 0.45 : 1,
-          boxShadow: state === 'future' ? undefined : `0 0 6px ${color}`,
         }}
       />
     </div>
@@ -161,10 +125,11 @@ function ChallengeNode({
 
   const numberDisplay = String(index + 1).padStart(2, '0');
 
+  // تصميم هادئ، فخم، ومريح للعين مستوحى من الـ Dark Theme الاحترافي
   const surface = isMaster
     ? isDone
-      ? 'border-2 border-amber-400/90 bg-gradient-to-br from-slate-950 via-emerald-950/90 to-amber-950/90 text-white shadow-[0_0_40px_rgba(245,158,11,0.45),inset_0_0_25px_rgba(16,185,129,0.25)]'
-      : 'border-2 border-amber-400/90 bg-gradient-to-br from-[#0f051d] via-[#240722] to-[#3b0a18] text-white shadow-[0_0_45px_rgba(239,68,68,0.45),0_0_80px_rgba(245,158,11,0.25),inset_0_0_30px_rgba(245,158,11,0.18)]'
+      ? 'border border-amber-500/60 bg-gradient-to-br from-slate-900 via-zinc-900 to-amber-950/40 text-white shadow-[0_4px_25px_rgba(217,119,6,0.2)]'
+      : 'border border-amber-500/70 bg-gradient-to-br from-[#121019] via-[#1a1322] to-[#241710] text-white shadow-[0_8px_32px_rgba(217,119,6,0.25)]'
     : isLocked
       ? 'border border-slate-200/70 bg-white/40 backdrop-blur-lg dark:border-slate-700/40 dark:bg-slate-800/20'
       : isDone
@@ -173,86 +138,26 @@ function ChallengeNode({
 
   const cardBody = (
     <motion.div
-      initial={isMaster ? { opacity: 0, scale: 0.75, y: 30 } : { opacity: 0, y: 24 }}
-      animate={
-        isMaster
-          ? {
-              opacity: 1,
-              y: [0, -5, 0],
-              scale: isActive ? [1.06, 1.1, 1.06] : 1.03,
-            }
-          : { opacity: 1, y: 0, scale: isActive ? [1.05, 1.07, 1.05] : 1 }
-      }
-      transition={
-        isMaster
-          ? {
-              opacity: { duration: 0.7 },
-              y: { duration: 3, repeat: Infinity, ease: 'easeInOut' },
-              scale: { duration: 2.2, repeat: Infinity, ease: 'easeInOut' },
-            }
-          : isActive
-            ? {
-                opacity: { duration: 0.5, delay: index * 0.06 },
-                y: { duration: 0.5, delay: index * 0.06 },
-                scale: { duration: 2.4, repeat: Infinity, ease: 'easeInOut' },
-              }
-            : { duration: 0.5, delay: index * 0.06 }
-      }
-      whileHover={!isLocked ? { y: -10, scale: isMaster ? 1.12 : 1.03, rotate: isDone ? 0 : -0.6 } : undefined}
-      whileTap={!isLocked ? { scale: 0.97 } : undefined}
-      style={{ width: CARD_W, minHeight: isMaster ? 184 : 168 }}
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: index * 0.04 }}
+      whileHover={!isLocked ? { y: -6, scale: 1.02 } : undefined}
+      whileTap={!isLocked ? { scale: 0.98 } : undefined}
+      style={{ width: CARD_W, minHeight: 168 }}
       className={`relative overflow-hidden rounded-3xl p-6 transition-colors duration-300 ${surface}`}
     >
-      {/* Master Challenge Animated Shimmer Sweep & Floating Embers */}
+      {/* إزالة الإزعاج البصري والوميض السريع، والاعتماد على هالة ناعمة وثابتة */}
       {isMaster && (
-        <>
-          <motion.span
-            aria-hidden
-            className="pointer-events-none absolute -inset-[2px] rounded-[26px] border-2 border-amber-300/80"
-            animate={{ opacity: [0.35, 1, 0.35] }}
-            transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.span
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 w-1/2 -skew-x-12 bg-gradient-to-r from-transparent via-amber-300/25 to-transparent"
-            initial={{ x: '-160%' }}
-            animate={{ x: '320%' }}
-            transition={{ duration: 2.2, repeat: Infinity, repeatDelay: 1.5, ease: 'easeInOut' }}
-          />
-          {[0, 1, 2, 3].map((spark) => (
-            <motion.span
-              key={spark}
-              aria-hidden
-              className="pointer-events-none absolute h-1.5 w-1.5 rounded-full bg-amber-300 shadow-[0_0_8px_#f59e0b]"
-              style={{ left: `${18 + spark * 22}%`, bottom: '10%' }}
-              animate={{ y: [0, -90], opacity: [0, 1, 0], scale: [0.5, 1.3, 0.4] }}
-              transition={{
-                duration: 2 + spark * 0.3,
-                repeat: Infinity,
-                delay: spark * 0.45,
-                ease: 'easeOut',
-              }}
-            />
-          ))}
-        </>
-      )}
-
-      {!isMaster && isActive && (
-        <motion.span
+        <div
           aria-hidden
-          className="pointer-events-none absolute -inset-[2px] rounded-[26px] border-2 border-purple-400/70"
-          animate={{ opacity: [0.3, 0.9, 0.3] }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          className="pointer-events-none absolute inset-0 rounded-3xl border border-amber-400/30 bg-amber-500/[0.03]"
         />
       )}
 
-      {isLocked && (
-        <motion.span
+      {!isMaster && isActive && (
+        <span
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/40 to-transparent dark:via-white/10"
-          initial={{ x: '-150%' }}
-          animate={{ x: '350%' }}
-          transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 3.5, ease: 'easeInOut' }}
+          className="pointer-events-none absolute -inset-[1px] rounded-[26px] border border-purple-400/50"
         />
       )}
 
@@ -262,7 +167,7 @@ function ChallengeNode({
           locale === 'ar' ? '-left-1' : '-right-1'
         } ${
           isMaster
-            ? 'text-amber-400/15 drop-shadow-[0_0_12px_rgba(245,158,11,0.3)]'
+            ? 'text-amber-500/10'
             : isLocked
               ? 'text-slate-400/20'
               : isDone
@@ -279,8 +184,8 @@ function ChallengeNode({
       >
         <div className="flex items-center justify-between gap-2">
           {isMaster ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/60 bg-gradient-to-r from-amber-500/30 via-red-500/30 to-purple-600/30 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.4)]">
-              <Crown size={13} className="text-amber-300" />
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-amber-300">
+              <Crown size={13} className="text-amber-400" />
               {locale === 'ar' ? 'التحدي الماستر' : 'MASTER BOSS'}
             </span>
           ) : (
@@ -292,20 +197,16 @@ function ChallengeNode({
           )}
 
           {isMaster && (
-            <motion.span
-              animate={{ rotate: [0, 12, -12, 0], scale: [1, 1.15, 1] }}
-              transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-400/20 text-amber-300"
-            >
-              {isDone ? <Sparkles size={15} /> : <Flame size={15} className="text-orange-400" />}
-            </motion.span>
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
+              {isDone ? <Sparkles size={13} /> : <Crown size={13} />}
+            </span>
           )}
         </div>
 
         <h3
-          className={`mb-1 mt-3 text-lg font-extrabold leading-snug ${
+          className={`mb-1 mt-3 text-lg font-bold leading-snug ${
             isMaster
-              ? 'bg-gradient-to-r from-white via-amber-100 to-amber-300 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(245,158,11,0.35)]'
+              ? 'text-amber-200'
               : isLocked
                 ? 'text-slate-400 dark:text-slate-500'
                 : 'text-slate-900 dark:text-white'
@@ -315,9 +216,9 @@ function ChallengeNode({
         </h3>
 
         <div
-          className={`flex items-center gap-1.5 text-sm font-extrabold ${
+          className={`flex items-center gap-1.5 text-sm font-semibold ${
             isMaster
-              ? 'text-amber-300'
+              ? 'text-amber-400/90'
               : isLocked
                 ? 'text-slate-400 dark:text-slate-600'
                 : 'text-purple-600 dark:text-purple-400'
@@ -327,8 +228,8 @@ function ChallengeNode({
             {challenge.points} {t('pts')}
           </span>
           {isMaster && (
-            <span className="text-[11px] font-bold text-rose-300/90">
-              • {locale === 'ar' ? 'الوحش الأخير' : 'FINAL STAGE'}
+            <span className="text-[11px] font-medium text-amber-300/70">
+              • {locale === 'ar' ? 'المرحلة الأخيرة' : 'Final Stage'}
             </span>
           )}
         </div>
@@ -347,40 +248,9 @@ function ChallengeNode({
   return (
     <div className="relative" style={{ width: CARD_W }}>
       {isMaster && !isLocked && (
-        <>
-          <motion.div
-            aria-hidden
-            className="pointer-events-none absolute -inset-8 -z-10 rounded-full blur-2xl"
-            style={{
-              background:
-                'conic-gradient(from 0deg, #f59e0b, #ef4444, #a855f7, #ec4899, #fde047, #f59e0b)',
-            }}
-            animate={{ rotate: 360, opacity: [0.55, 0.85, 0.55], scale: [0.95, 1.08, 0.95] }}
-            transition={{
-              rotate: { duration: 6, repeat: Infinity, ease: 'linear' },
-              opacity: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
-              scale: { duration: 2.5, repeat: Infinity, ease: 'easeInOut' },
-            }}
-          />
-          <motion.div
-            aria-hidden
-            className="pointer-events-none absolute -inset-12 -z-20 rounded-full bg-gradient-to-r from-amber-500/30 via-red-600/30 to-purple-600/30 blur-3xl"
-            animate={{ opacity: [0.3, 0.65, 0.3], scale: [0.9, 1.12, 0.9] }}
-            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-          />
-        </>
-      )}
-
-      {!isMaster && isActive && (
-        <motion.div
+        <div
           aria-hidden
-          className="pointer-events-none absolute -inset-6 -z-10 rounded-full blur-2xl"
-          style={{ background: 'conic-gradient(from 0deg, #a855f7, #7e22ce, #c084fc, #a855f7)' }}
-          animate={{ rotate: 360, opacity: [0.35, 0.55, 0.35] }}
-          transition={{
-            rotate: { duration: 9, repeat: Infinity, ease: 'linear' },
-            opacity: { duration: 2.4, repeat: Infinity, ease: 'easeInOut' },
-          }}
+          className="pointer-events-none absolute -inset-3 -z-10 rounded-3xl bg-amber-500/10 blur-xl"
         />
       )}
 
@@ -402,7 +272,6 @@ export default function SnakePath({
   labSlug: string;
   challenges: PathChallenge[];
 }) {
-  // Hide the 6th Master Challenge completely until all first 5 challenges are solved
   const firstFiveSolved =
     challenges.length >= 6 && challenges.slice(0, 5).every((c) => Boolean(c.solved));
 
