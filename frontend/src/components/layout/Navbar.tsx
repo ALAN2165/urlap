@@ -4,17 +4,20 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { BookOpen, LayoutDashboard, Trophy, Megaphone, Terminal, Menu, X } from 'lucide-react';
+import { BookOpen, Mail, Trophy, Megaphone, Terminal, Menu, X } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import LanguageToggle from './LanguageToggle';
 import LogoOrb from '@/components/shared/LogoOrb';
 import AvatarMenu from '@/components/shared/AvatarMenu';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserInboxSocket } from '@/hooks/useUserInboxSocket';
+import { api } from '@/lib/api';
 
 const LINKS = [
   { href: '/challenges', icon: BookOpen, key: 'challenges' },
-  { href: '/dashboard', icon: LayoutDashboard, key: 'dashboard' },
+  { href: '/inbox', icon: Mail, key: 'inbox' },
   { href: '/leaderboard', icon: Trophy, key: 'leaderboard' },
   { href: '/announcements', icon: Megaphone, key: 'announcements' },
   { href: '/playground', icon: Terminal, key: 'playground' },
@@ -25,6 +28,16 @@ export default function Navbar() {
   const { user } = useAuth();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useUserInboxSocket();
+
+  const { data: unread } = useQuery({
+    queryKey: ['inbox-unread'],
+    queryFn: async () => (await api.get('/inbox/unread-count')).data,
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+  const unreadCount = unread?.count ?? 0;
 
   useEffect(() => {
     setMobileOpen(false);
@@ -48,6 +61,8 @@ export default function Navbar() {
           <div className="hidden items-center gap-1 lg:flex">
             {LINKS.map((link) => {
               const active = isActive(link.href);
+              const showBadge = link.key === 'inbox' && unreadCount > 0;
+
               return (
                 <Link
                   key={link.href}
@@ -65,7 +80,17 @@ export default function Navbar() {
                       transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                     />
                   )}
-                  <span className="relative z-10">{t(link.key)}</span>
+                  <span className="relative z-10 flex items-center gap-2">
+                    {t(link.key)}
+                    {showBadge && (
+                      <span className="relative flex h-5 min-w-[20px] items-center justify-center">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                        <span className="relative inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-extrabold text-white shadow-[0_0_10px_rgba(239,68,68,0.8)]">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
+                      </span>
+                    )}
+                  </span>
                 </Link>
               );
             })}
@@ -82,8 +107,14 @@ export default function Navbar() {
               <button
                 onClick={() => setMobileOpen((v) => !v)}
                 aria-label="Toggle navigation menu"
-                className="flex h-10 w-10 items-center justify-center rounded-full glass lg:hidden"
+                className="relative flex h-10 w-10 items-center justify-center rounded-full glass lg:hidden"
               >
+                {unreadCount > 0 && !mobileOpen && (
+                  <span className="absolute right-0.5 top-0.5 flex h-3 w-3">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
+                  </span>
+                )}
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.span
                     key={mobileOpen ? 'close' : 'open'}
@@ -135,6 +166,8 @@ export default function Navbar() {
             <div className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3 sm:px-6">
               {LINKS.map((link, i) => {
                 const active = isActive(link.href);
+                const showBadge = link.key === 'inbox' && unreadCount > 0;
+
                 return (
                   <motion.div
                     key={link.href}
@@ -144,14 +177,21 @@ export default function Navbar() {
                   >
                     <Link
                       href={link.href}
-                      className={`flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-semibold transition-colors ${
+                      className={`flex items-center justify-between rounded-xl px-4 py-3 text-[15px] font-semibold transition-colors ${
                         active
                           ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300'
                           : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/50'
                       }`}
                     >
-                      <link.icon size={18} />
-                      {t(link.key)}
+                      <span className="flex items-center gap-3">
+                        <link.icon size={18} />
+                        {t(link.key)}
+                      </span>
+                      {showBadge && (
+                        <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-extrabold text-white shadow-[0_0_10px_rgba(239,68,68,0.7)]">
+                          {unreadCount}
+                        </span>
+                      )}
                     </Link>
                   </motion.div>
                 );
