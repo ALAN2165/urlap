@@ -16,20 +16,80 @@ export interface GradeResult {
   runtimeMs: number;
   resultColumns: string[];
   resultRows: unknown[][];
+  expectedColumns?: string[];
+  expectedRows?: unknown[][];
   totalRows: number;
   expectedRowCount: number | null;
-  failureReason: 'COLUMNS' | 'ROW_COUNT' | 'ROWS' | 'NOT_ROW_RETURNING' | null;
+  failureReason:
+    | 'COLUMNS'
+    | 'ROW_COUNT'
+    | 'ROWS'
+    | 'SCHEMA'
+    | 'CONSTRAINTS'
+    | 'SEQUENCE'
+    | 'STEPS'
+    | 'NOT_ROW_RETURNING'
+    | null;
 }
 
 type FailureReason = GradeResult['failureReason'];
-interface QueryOutput { columns: string[]; rows: unknown[][]; }
-interface TableState { name: string; present: boolean; columns: string[]; rows: unknown[][]; }
-interface SandboxRun { result: QueryOutput | null; before: TableState[] | null; after: TableState[] | null; }
+interface QueryOutput {
+  columns: string[];
+  rows: unknown[][];
+}
+
+interface ColumnMeta {
+  name: string;
+  type: string;
+  notNull: boolean;
+}
+
+interface SequenceState {
+  name: string;
+  start: string;
+  increment: string;
+  max: string;
+}
+
+interface TableState {
+  name: string;
+  present: boolean;
+  columns: string[];
+  columnMeta: ColumnMeta[];
+  constraints: string[];
+  rows: unknown[][];
+}
+
+interface SandboxSnapshot {
+  tables: TableState[];
+  sequences: SequenceState[];
+}
+
+interface SandboxRun {
+  result: QueryOutput | null;
+  before: SandboxSnapshot | null;
+  after: SandboxSnapshot | null;
+  stepFingerprints: string[];
+  tclEvents: string[];
+}
 
 const quoteIdent = (name: string) => `"${name.replace(/"/g, '""')}"`;
 
 function emptyResult(start: number, status: GradeResult['status'], errorMessage: string): GradeResult {
-  return { passed: false, status, output: '', errorMessage, runtimeMs: Date.now() - start, resultColumns: [], resultRows: [], totalRows: 0, expectedRowCount: null, failureReason: null };
+  return {
+    passed: false,
+    status,
+    output: '',
+    errorMessage,
+    runtimeMs: Date.now() - start,
+    resultColumns: [],
+    resultRows: [],
+    expectedColumns: [],
+    expectedRows: [],
+    totalRows: 0,
+    expectedRowCount: null,
+    failureReason: null,
+  };
 }
 
 function describeError(err: any): string {
@@ -43,7 +103,7 @@ function failureFromError(start: number, err: any): GradeResult {
 }
 
 // ---------------------------------------------------------------------------
-// Text handling
+// Text handling & Oracle -> PostgreSQL Compatibility
 // ---------------------------------------------------------------------------
 
 function splitStatements(sql: string): string[] {
@@ -71,8 +131,14 @@ function splitStatements(sql: string): string[] {
     if (ch === "'") {
       let j = i + 1;
       while (j < n) {
-        if (sql[j] === "'" && sql[j + 1] === "'") { j += 2; continue; }
-        if (sql[j] === "'") { j += 1; break; }
+        if (sql[j] === "'" && sql[j + 1] === "'") {
+          j += 2;
+          continue;
+        }
+        if (sql[j] === "'") {
+          j += 1;
+          break;
+        }
         j += 1;
       }
       current += sql.slice(i, j);
@@ -82,8 +148,14 @@ function splitStatements(sql: string): string[] {
     if (ch === '"') {
       let j = i + 1;
       while (j < n) {
-        if (sql[j] === '"' && sql[j + 1] === '"') { j += 2; continue; }
-        if (sql[j] === '"') { j += 1; break; }
+        if (sql[j] === '"' && sql[j + 1] === '"') {
+          j += 2;
+          continue;
+        }
+        if (sql[j] === '"') {
+          j += 1;
+          break;
+        }
         j += 1;
       }
       current += sql.slice(i, j);
@@ -101,7 +173,12 @@ function splitStatements(sql: string): string[] {
         continue;
       }
     }
-    if (ch === ';') { statements.push(current); current = ''; i += 1; continue; }
+    if (ch === ';') {
+      statements.push(current);
+      current = '';
+      i += 1;
+      continue;
+    }
     current += ch;
     i += 1;
   }
@@ -109,15 +186,24 @@ function splitStatements(sql: string): string[] {
   return statements.map((s) => s.trim()).filter(Boolean);
 }
 
-/** Oracle's bare SYSDATE keyword -> CURRENT_DATE (skips strings, comments and $-quoted bodies). */
-function applyCompatibilityRewrites(sql: string): string {
+/** Rewrites tokens outside string literals, comments, and quoted identifiers. */
+function transformOutsideLiterals(sql: string, fn: (chunk: string) => string): string {
   let out = '';
+  let buf = '';
   let i = 0;
   const n = sql.length;
+
+  const flush = () => {
+    if (buf) {
+      out += fn(buf);
+      buf = '';
+    }
+  };
 
   while (i < n) {
     const ch = sql[i];
     if (ch === '-' && sql[i + 1] === '-') {
+      flush();
       const nl = sql.indexOf('\n', i);
       const stop = nl === -1 ? n : nl;
       out += sql.slice(i, stop);
@@ -125,28 +211,25 @@ function applyCompatibilityRewrites(sql: string): string {
       continue;
     }
     if (ch === '/' && sql[i + 1] === '*') {
+      flush();
       const end = sql.indexOf('*/', i + 2);
       const stop = end === -1 ? n : end + 2;
       out += sql.slice(i, stop);
       i = stop;
       continue;
     }
-    if (ch === "'") {
+    if (ch === "'" || ch === '"') {
+      flush();
       let j = i + 1;
       while (j < n) {
-        if (sql[j] === "'" && sql[j + 1] === "'") { j += 2; continue; }
-        if (sql[j] === "'") { j += 1; break; }
-        j += 1;
-      }
-      out += sql.slice(i, j);
-      i = j;
-      continue;
-    }
-    if (ch === '"') {
-      let j = i + 1;
-      while (j < n) {
-        if (sql[j] === '"' && sql[j + 1] === '"') { j += 2; continue; }
-        if (sql[j] === '"') { j += 1; break; }
+        if (sql[j] === ch && sql[j + 1] === ch) {
+          j += 2;
+          continue;
+        }
+        if (sql[j] === ch) {
+          j += 1;
+          break;
+        }
         j += 1;
       }
       out += sql.slice(i, j);
@@ -156,6 +239,7 @@ function applyCompatibilityRewrites(sql: string): string {
     if (ch === '$') {
       const tagMatch = /^\$([A-Za-z0-9_]*)\$/.exec(sql.slice(i));
       if (tagMatch) {
+        flush();
         const tag = tagMatch[0];
         const closeIdx = sql.indexOf(tag, i + tag.length);
         const stop = closeIdx === -1 ? n : closeIdx + tag.length;
@@ -164,20 +248,74 @@ function applyCompatibilityRewrites(sql: string): string {
         continue;
       }
     }
-    const rest = sql.slice(i);
-    const match = /^SYSDATE\b/i.exec(rest);
-    if (match) {
-      const after = sql[i + match[0].length];
-      if (after !== '(') { out += 'CURRENT_DATE'; i += match[0].length; continue; }
-    }
-    out += ch;
+    buf += ch;
     i += 1;
   }
+  flush();
   return out;
 }
 
-/** Same-length copy of `sql` with comments, string literals, quoted identifiers and $-quoted
- *  bodies blanked out, so keyword/paren scans can't be fooled while indexes still line up. */
+/** Oracle compatibility rewrites: SYSDATE, VARCHAR2, NUMBER, seq.NEXTVAL/CURRVAL, and Oracle DDL syntax. */
+function applyCompatibilityRewrites(sql: string): string {
+  const tokenRewritten = transformOutsideLiterals(sql, (chunk) => {
+    return chunk
+      // SYSDATE -> CURRENT_DATE
+      .replace(/\bSYSDATE\b(?!\s*\()/gi, 'CURRENT_DATE')
+      // NVARCHAR2(n) / VARCHAR2(n [BYTE|CHAR]) -> VARCHAR(n)
+      .replace(/\bN?VARCHAR2\s*\(\s*(\d+)(?:\s+(?:BYTE\vert{}CHAR))?\s*\)/gi, 'VARCHAR($1)')
+      // NUMBER(p, s) -> NUMERIC(p, s)
+      .replace(/\bNUMBER\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)/gi, 'NUMERIC($1, $2)')
+      // NUMBER(p) -> NUMERIC(p)
+      .replace(/\bNUMBER\s*\(\s*(\d+)\s*\)/gi, 'NUMERIC($1)')
+      // Bare NUMBER -> NUMERIC
+      .replace(/\bNUMBER\b/gi, 'NUMERIC')
+      // seq.NEXTVAL / seq.CURRVAL -> nextval('seq') / currval('seq')
+      .replace(/\b([A-Za-z_][\w$]*)\s*\.\s*NEXTVAL\b/gi, (_, seq) => `nextval('${seq.toLowerCase()}')`)
+      .replace(/\b([A-Za-z_][\w$]*)\s*\.\s*CURRVAL\b/gi, (_, seq) => `currval('${seq.toLowerCase()}')`)
+      // Sequence options in Oracle
+      .replace(/\bNOCACHE\b/gi, '')
+      .replace(/\bNOCYCLE\b/gi, 'NO CYCLE')
+      .replace(/\bNOMAXVALUE\b/gi, 'NO MAXVALUE')
+      .replace(/\bNOMINVALUE\b/gi, 'NO MINVALUE');
+  });
+
+  return rewriteOracleDdlStatement(tokenRewritten);
+}
+
+/** Rewrites Oracle-specific ALTER TABLE statements into valid PostgreSQL DDL. */
+function rewriteOracleDdlStatement(stmt: string): string {
+  let s = stmt.trim();
+
+  // 1. ALTER TABLE <tbl> DROP PRIMARY KEY [CASCADE] -> ALTER TABLE <tbl> DROP CONSTRAINT <tbl>_pkey [CASCADE]
+  s = s.replace(
+    /^(\s*ALTER\s+TABLE\s+([A-Za-z_][\w$]*)\s+)DROP\s+PRIMARY\s+KEY(\s+CASCADE)?\s*$/i,
+    (_, prefix, tbl, cascade) => `${prefix}DROP CONSTRAINT ${tbl.toLowerCase()}_pkey${cascade || ''}`
+  );
+
+  // 2. ALTER TABLE <tbl> MODIFY (col type ...) or ALTER TABLE <tbl> MODIFY [COLUMN] col type
+  s = s.replace(
+    /^(\s*ALTER\s+TABLE\s+[A-Za-z_][\w$]*\s+)MODIFY\s*\(\s*([A-Za-z_][\w$]*)\s+([^)]+?)\s*\)\s*$/i,
+    '$1ALTER COLUMN $2 TYPE $3'
+  );
+  s = s.replace(
+    /^(\s*ALTER\s+TABLE\s+[A-Za-z_][\w$]*\s+)MODIFY(?:\s+COLUMN)?\s+([A-Za-z_][\w$]*)\s+(.+?)\s*$/i,
+    '$1ALTER COLUMN $2 TYPE $3'
+  );
+
+  // 3. ALTER TABLE <tbl> ADD (<col_def>) -> ALTER TABLE <tbl> ADD COLUMN <col_def>
+  // (Skip if inside parens starts with CONSTRAINT / PRIMARY / FOREIGN / UNIQUE / CHECK)
+  const addParenMatch = /^(\s*ALTER\s+TABLE\s+[A-Za-z_][\w$]*\s+)ADD\s*\(\s*([\s\S]+)\s*\)\s*$/i.exec(s);
+  if (addParenMatch) {
+    const prefix = addParenMatch[1];
+    const inner = addParenMatch[2].trim();
+    if (!/^(CONSTRAINT|PRIMARY|FOREIGN|UNIQUE|CHECK)\b/i.test(inner)) {
+      s = `${prefix}ADD COLUMN ${inner}`;
+    }
+  }
+
+  return s;
+}
+
 function maskSql(sql: string): string {
   const out = sql.split('');
   const n = sql.length;
@@ -204,8 +342,14 @@ function maskSql(sql: string): string {
     if (ch === "'" || ch === '"') {
       let j = i + 1;
       while (j < n) {
-        if (sql[j] === ch && sql[j + 1] === ch) { j += 2; continue; }
-        if (sql[j] === ch) { j += 1; break; }
+        if (sql[j] === ch && sql[j + 1] === ch) {
+          j += 2;
+          continue;
+        }
+        if (sql[j] === ch) {
+          j += 1;
+          break;
+        }
         j += 1;
       }
       blank(i, j);
@@ -240,13 +384,6 @@ function stripPlusMarkers(text: string, mask: string): string {
   return out + text.slice(last);
 }
 
-/**
- * PostgreSQL has no Oracle (+) outer-join operator. This turns the common shape
- *   SELECT ... FROM a x, b y WHERE x.k(+) = y.k [AND ...]
- * into
- *   SELECT ... FROM b y LEFT JOIN a x ON (x.k = y.k) [WHERE ...]
- * Anything it doesn't fully understand is returned untouched (Postgres then reports its own error).
- */
 function rewriteOracleOuterJoins(sql: string): string {
   const masked = maskSql(sql);
   const PLUS = /\(\s*\+\s*\)/;
@@ -284,7 +421,7 @@ function rewriteOracleOuterJoins(sql: string): string {
   const whereStart = whereMark.end;
   const whereEnd = afterWhere ? afterWhere.start : n;
 
-  if (/\bJOIN\b/i.test(masked.slice(fromStart, fromEnd))) return sql; // mixed syntax: leave alone
+  if (/\bJOIN\b/i.test(masked.slice(fromStart, fromEnd))) return sql;
 
   const topLevel = (re: RegExp, from: number, to: number) => {
     const found: { index: number; length: number }[] = [];
@@ -297,7 +434,6 @@ function rewriteOracleOuterJoins(sql: string): string {
     return found;
   };
 
-  // FROM list, split on top-level commas
   const fromItems: string[] = [];
   let itemStart = fromStart;
   for (let i = fromStart; i < fromEnd; i++) {
@@ -317,9 +453,8 @@ function rewriteOracleOuterJoins(sql: string): string {
   });
   if (parsed.some((p) => p === null)) return sql;
   const items = parsed as { text: string; alias: string }[];
-  if (items.some((it, i) => items.findIndex((o) => o.alias === it.alias) !== i)) return sql; // duplicate alias
+  if (items.some((it, i) => items.findIndex((o) => o.alias === it.alias) !== i)) return sql;
 
-  // WHERE split on top-level AND (a BETWEEN's AND is split too, but re-joined with AND below)
   if (topLevel(/\bOR\b/, whereStart, whereEnd).length > 0) return sql;
   const ands = topLevel(/\bAND\b/, whereStart, whereEnd);
   const conjuncts: { text: string; mask: string }[] = [];
@@ -364,15 +499,25 @@ function rewriteOracleOuterJoins(sql: string): string {
 }
 
 function normalizeSql(sql: string): string[] {
-  return splitStatements(applyCompatibilityRewrites(sql)).map(rewriteOracleOuterJoins);
+  return splitStatements(sql)
+    .map(applyCompatibilityRewrites)
+    .map(rewriteOracleOuterJoins);
 }
 
 function stripLeadingCommentsAndWhitespace(sql: string): string {
   let s = sql;
   for (let guard = 0; guard < 50; guard++) {
     const trimmed = s.replace(/^\s+/, '');
-    if (trimmed.startsWith('--')) { const nl = trimmed.indexOf('\n'); s = nl === -1 ? '' : trimmed.slice(nl + 1); continue; }
-    if (trimmed.startsWith('/*')) { const end = trimmed.indexOf('*/'); s = end === -1 ? '' : trimmed.slice(end + 2); continue; }
+    if (trimmed.startsWith('--')) {
+      const nl = trimmed.indexOf('\n');
+      s = nl === -1 ? '' : trimmed.slice(nl + 1);
+      continue;
+    }
+    if (trimmed.startsWith('/*')) {
+      const end = trimmed.indexOf('*/');
+      s = end === -1 ? '' : trimmed.slice(end + 2);
+      continue;
+    }
     return trimmed;
   }
   return s;
@@ -388,13 +533,12 @@ function isRowReturning(stmt: string): boolean {
   return w === 'select' || w === 'with';
 }
 
-// Transaction / session control would let a script escape the sandbox (e.g. COMMIT, or ROLLBACK
-// followed by autocommitted writes), or lift limits (SET statement_timeout).
+// Note: SAVEPOINT, ROLLBACK, and COMMIT are now handled safely inside `runSandboxed`
 const BLOCKED_FIRST_WORDS = [
-  'begin', 'start', 'commit', 'end', 'rollback', 'abort', 'savepoint', 'release',
+  'begin', 'start', 'end', 'abort',
   'set', 'reset', 'prepare', 'deallocate', 'declare', 'fetch', 'close', 'move',
   'listen', 'unlisten', 'notify', 'load', 'copy', 'lock', 'discard', 'checkpoint',
-  'vacuum', 'reindex', 'cluster',
+  'vacuum', 'reindex', 'cluster', 'grant', 'revoke', 'truncate',
 ];
 
 function assertStatementsAllowed(statements: string[]): void {
@@ -402,7 +546,7 @@ function assertStatementsAllowed(statements: string[]): void {
     const word = firstWord(stmt);
     if (BLOCKED_FIRST_WORDS.indexOf(word) !== -1) {
       const err: any = new Error(
-        `"${word.toUpperCase()}" statements aren't allowed here. Every query already runs in its own sandbox and is undone automatically, so you don't need transaction or session commands.`
+        `"${word.toUpperCase()}" statements aren't allowed here.`
       );
       err.blocked = true;
       throw err;
@@ -411,19 +555,32 @@ function assertStatementsAllowed(statements: string[]): void {
 }
 
 // ---------------------------------------------------------------------------
-// Value comparison
+// Value & Schema comparison
 // ---------------------------------------------------------------------------
 
 function normalizeValue(value: unknown): unknown {
   if (value === null || value === undefined) return null;
   if (value instanceof Date) return value.toISOString();
   if (typeof value === 'number') return Math.round(value * 1e9) / 1e9;
+  if (typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value.trim())) {
+    const num = Number(value);
+    if (!Number.isNaN(num)) return Math.round(num * 1e9) / 1e9;
+  }
   return value;
 }
 const rowKey = (row: unknown[]) => JSON.stringify(row.map(normalizeValue));
 
-/** Output comparison: column NAMES are never compared, only how many columns there are and
- *  what values they hold, positionally. */
+function normalizePgType(typeStr: string): string {
+  return typeStr
+    .toLowerCase()
+    .replace(/\bcharacter varying\b/g, 'varchar')
+    .replace(/\bcharacter\b/g, 'char')
+    .replace(/\binteger\b/g, 'numeric')
+    .replace(/\bbigint\b/g, 'numeric')
+    .replace(/\bsmallint\b/g, 'numeric')
+    .replace(/\s+/g, '');
+}
+
 function compareOutputs(submitted: QueryOutput, expected: QueryOutput, orderMatters: boolean): FailureReason {
   if (submitted.columns.length !== expected.columns.length) return 'COLUMNS';
   if (submitted.rows.length !== expected.rows.length) return 'ROW_COUNT';
@@ -435,30 +592,158 @@ function compareOutputs(submitted: QueryOutput, expected: QueryOutput, orderMatt
   return same ? null : 'ROWS';
 }
 
-function compareStates(submitted: TableState[], expected: TableState[]): FailureReason {
-  for (const exp of expected) {
-    const sub = submitted.find((t) => t.name === exp.name);
-    if (!sub || sub.present !== exp.present) return 'ROWS';
-    if (!exp.present) continue;
-    if (sub.columns.length !== exp.columns.length) return 'COLUMNS';
-    if (sub.rows.length !== exp.rows.length) return 'ROW_COUNT';
-    if (JSON.stringify(sub.rows.map(rowKey).sort()) !== JSON.stringify(exp.rows.map(rowKey).sort())) return 'ROWS';
+function compareSnapshots(
+  subRun: SandboxRun,
+  refRun: SandboxRun
+): { reason: FailureReason; detail: string } {
+  const submitted = subRun.after!;
+  const expected = refRun.after!;
+
+  // 1. Compare sequences (if reference created/modified sequences)
+  if (expected.sequences.length > 0) {
+    for (const expSeq of expected.sequences) {
+      const subSeq = submitted.sequences.find((s) => s.name === expSeq.name);
+      if (
+        !subSeq ||
+        subSeq.start !== expSeq.start ||
+        subSeq.increment !== expSeq.increment ||
+        subSeq.max !== expSeq.max
+      ) {
+        return {
+          reason: 'SEQUENCE',
+          detail: `Sequence "${expSeq.name}" is missing or its START/INCREMENT/MAXVALUE settings do not match.`,
+        };
+      }
+    }
   }
-  return null;
+
+  // 2. Compare tables, column types, constraints, and row data
+  for (const exp of expected.tables) {
+    const sub = submitted.tables.find((t) => t.name === exp.name);
+    if (!sub || sub.present !== exp.present) {
+      return {
+        reason: 'SCHEMA',
+        detail: exp.present
+          ? `Expected table "${exp.name}" to exist, but it was not found.`
+          : `Expected table "${exp.name}" to be dropped, but it still exists.`,
+      };
+    }
+    if (!exp.present) continue;
+
+    // Column count & metadata (name, data type, NOT NULL)
+    if (sub.columnMeta.length !== exp.columnMeta.length) {
+      return {
+        reason: 'COLUMNS',
+        detail: `Table "${exp.name}" has ${sub.columnMeta.length} column(s), expected ${exp.columnMeta.length}.`,
+      };
+    }
+    for (let i = 0; i < exp.columnMeta.length; i++) {
+      const ec = exp.columnMeta[i];
+      const sc = sub.columnMeta.find((c) => c.name === ec.name);
+      if (!sc) {
+        return {
+          reason: 'SCHEMA',
+          detail: `Column "${ec.name}" is missing on table "${exp.name}".`,
+        };
+      }
+      if (sc.type !== ec.type) {
+        return {
+          reason: 'SCHEMA',
+          detail: `Column "${exp.name}.${ec.name}" has type "${sc.type}", expected "${ec.type}".`,
+        };
+      }
+      if (sc.notNull !== ec.notNull) {
+        return {
+          reason: 'CONSTRAINTS',
+          detail: `Column "${exp.name}.${ec.name}" NOT NULL constraint does not match expected definition.`,
+        };
+      }
+    }
+
+    // Table constraints (PK, FK, UNIQUE, CHECK)
+    const expConstraints = exp.constraints.slice().sort();
+    const subConstraints = sub.constraints.slice().sort();
+    if (JSON.stringify(expConstraints) !== JSON.stringify(subConstraints)) {
+      return {
+        reason: 'CONSTRAINTS',
+        detail: `Constraints on table "${exp.name}" do not match expected PRIMARY KEY, FOREIGN KEY, UNIQUE, or CHECK definitions.`,
+      };
+    }
+
+    // Row data
+    if (sub.rows.length !== exp.rows.length) {
+      return {
+        reason: 'ROW_COUNT',
+        detail: `Table "${exp.name}" has ${sub.rows.length} row(s), expected ${exp.rows.length}.`,
+      };
+    }
+    if (JSON.stringify(sub.rows.map(rowKey).sort()) !== JSON.stringify(exp.rows.map(rowKey).sort())) {
+      return {
+        reason: 'ROWS',
+        detail: `The rows in table "${exp.name}" do not match the expected data.`,
+      };
+    }
+  }
+
+  // 3. Verify TCL events if reference used TCL (SAVEPOINT, ROLLBACK TO, COMMIT)
+  if (refRun.tclEvents.length > 0) {
+    if (JSON.stringify(subRun.tclEvents) !== JSON.stringify(refRun.tclEvents)) {
+      return {
+        reason: 'STEPS',
+        detail: `Expected transaction control steps (${refRun.tclEvents.join(' -> ')}) were not executed in the required order.`,
+      };
+    }
+  }
+
+  // 4. Verify intermediate step states for multi-step challenges (e.g. ADD then DROP column, or INSERT then ROLLBACK TO)
+  if (refRun.stepFingerprints.length > 1) {
+    let subIdx = 0;
+    for (const reqFp of refRun.stepFingerprints) {
+      while (subIdx < subRun.stepFingerprints.length && subRun.stepFingerprints[subIdx] !== reqFp) {
+        subIdx++;
+      }
+      if (subIdx >= subRun.stepFingerprints.length) {
+        return {
+          reason: 'STEPS',
+          detail: 'One or more required intermediate steps in the multi-statement challenge were skipped or incorrect.',
+        };
+      }
+      subIdx++;
+    }
+  }
+
+  return { reason: null, detail: '' };
 }
 
-const fingerprint = (t: TableState) => JSON.stringify([t.present, t.columns.length, t.rows.map(rowKey).sort()]);
+const tableFingerprint = (t: TableState) =>
+  JSON.stringify([
+    t.name,
+    t.present,
+    t.columnMeta,
+    t.constraints.slice().sort(),
+    t.rows.map(rowKey).sort(),
+  ]);
+
+const snapshotFingerprint = (s: SandboxSnapshot) =>
+  JSON.stringify({
+    tables: s.tables.map(tableFingerprint),
+    sequences: s.sequences,
+  });
 
 function firstChangedTable(before: TableState[], after: TableState[]): string | null {
+  for (const a of after) {
+    const b = before.find((t) => t.name === a.name);
+    if (!b || tableFingerprint(a) !== tableFingerprint(b)) return a.name;
+  }
   for (const b of before) {
     const a = after.find((t) => t.name === b.name);
-    if (!a || fingerprint(a) !== fingerprint(b)) return b.name;
+    if (!a || tableFingerprint(a) !== tableFingerprint(b)) return b.name;
   }
   return null;
 }
 
 // ---------------------------------------------------------------------------
-// Sandbox execution
+// Sandbox execution & Lab 4 Environment Preparation
 // ---------------------------------------------------------------------------
 
 async function runCursor(client: PoolClient, sql: string): Promise<QueryOutput> {
@@ -468,11 +753,7 @@ async function runCursor(client: PoolClient, sql: string): Promise<QueryOutput> 
   return { columns: res.fields.map((f) => f.name), rows: res.rows as unknown[][] };
 }
 
-/** Copies every playground table into a private TEMP table of the same name (dropped when the
- *  transaction ends). Temp tables are searched before the playground schema, so the student's
- *  unqualified `employees` is the copy. INSERT/UPDATE/DELETE hit the copy and the grader role has
- *  no write access to the real tables at all. */
-async function prepareSandbox(client: PoolClient): Promise<string[]> {
+async function prepareSandbox(client: PoolClient, targetsToCreateFresh: Set<string>): Promise<void> {
   const res = await client.query<{ tablename: string }>(
     `SELECT tablename FROM pg_tables WHERE schemaname = '${SANDBOX_SCHEMA}' ORDER BY tablename`
   );
@@ -482,44 +763,268 @@ async function prepareSandbox(client: PoolClient): Promise<string[]> {
     await client.query(`CREATE TEMP TABLE ${q} (LIKE ${SANDBOX_SCHEMA}.${q} INCLUDING ALL) ON COMMIT DROP`);
     await client.query(`INSERT INTO pg_temp.${q} SELECT * FROM ${SANDBOX_SCHEMA}.${q}`);
   }
-  return names;
+
+  // Ensure temp schema is searched first so unqualified CREATE TABLE / SEQUENCE lands in pg_temp
+  await client.query(`SET LOCAL search_path = pg_temp, ${SANDBOX_SCHEMA}, public`);
+
+  // Ensure Lab 4 auxiliary tables and constraints exist in pg_temp
+  if (names.includes('departments')) {
+    const pkCheck = await client.query(
+      `SELECT 1 FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid JOIN pg_namespace n ON n.oid = t.relnamespace
+       WHERE n.nspname LIKE 'pg_temp%' AND t.relname = 'departments' AND c.contype = 'p'`
+    );
+    if (pkCheck.rowCount === 0) {
+      await client
+        .query(`ALTER TABLE pg_temp.departments ADD CONSTRAINT departments_pkey PRIMARY KEY (department_id)`)
+        .catch(() => undefined);
+    }
+  }
+
+  if (names.includes('employees')) {
+    const empPkCheck = await client.query(
+      `SELECT 1 FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid JOIN pg_namespace n ON n.oid = t.relnamespace
+       WHERE n.nspname LIKE 'pg_temp%' AND t.relname = 'employees' AND c.contype = 'p'`
+    );
+    if (empPkCheck.rowCount === 0) {
+      await client
+        .query(`ALTER TABLE pg_temp.employees ADD CONSTRAINT employees_pkey PRIMARY KEY (employee_id)`)
+        .catch(() => undefined);
+    }
+    const fkCheck = await client.query(
+      `SELECT 1 FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid JOIN pg_namespace n ON n.oid = t.relnamespace
+       WHERE n.nspname LIKE 'pg_temp%' AND t.relname = 'employees' AND c.conname = 'emp_manager_fk'`
+    );
+    if (fkCheck.rowCount === 0) {
+      await client
+        .query(
+          `ALTER TABLE pg_temp.employees ADD CONSTRAINT emp_manager_fk FOREIGN KEY (manager_id) REFERENCES pg_temp.employees(employee_id)`
+        )
+        .catch(() => undefined);
+    }
+  }
+
+  if (!names.includes('dept')) {
+    await client.query(`
+      CREATE TEMP TABLE dept (
+        deptno NUMERIC(4),
+        dname VARCHAR(14),
+        loc VARCHAR(13)
+      ) ON COMMIT DROP
+    `);
+  }
+
+  if (!names.includes('dept80')) {
+    await client.query(`
+      CREATE TEMP TABLE dept80 (
+        employee_id NUMERIC(6),
+        last_name VARCHAR(20),
+        annsal NUMERIC(10,2),
+        hire_date DATE
+      ) ON COMMIT DROP
+    `);
+    if (names.includes('employees')) {
+      await client
+        .query(
+          `INSERT INTO pg_temp.dept80 (employee_id, last_name, annsal, hire_date)
+           SELECT employee_id, SUBSTRING(last_name FROM 1 FOR 20), salary * 12, hire_date
+           FROM pg_temp.employees WHERE department_id = 80`
+        )
+        .catch(() => undefined);
+    }
+  }
+
+  if (!names.includes('emp')) {
+    await client.query(`
+      CREATE TEMP TABLE emp (
+        empno NUMERIC(4) PRIMARY KEY,
+        ename VARCHAR(10),
+        job VARCHAR(9),
+        mgr NUMERIC(4),
+        hiredate DATE,
+        sal NUMERIC(7,2),
+        comm NUMERIC(7,2),
+        deptno NUMERIC(2)
+      ) ON COMMIT DROP;
+      INSERT INTO pg_temp.emp VALUES
+        (7369, 'SMITH',  'CLERK',   7902, '1980-12-17',  800.00, NULL, 20),
+        (7499, 'ALLEN',  'SALESMAN',7698, '1981-02-20', 1600.00, 300.00, 30),
+        (7566, 'JONES',  'MANAGER', 7839, '1981-04-02', 2975.00, NULL, 20),
+        (7876, 'ADAMS',  'CLERK',   7788, '1987-05-23', 1100.00, NULL, 20),
+        (7900, 'JAMES',  'CLERK',   7698, '1981-12-03',  950.00, NULL, 30),
+        (7934, 'MILLER', 'CLERK',   7782, '1982-01-23', 1300.00, NULL, 10);
+    `);
+  }
+
+  if (!names.includes('region')) {
+    await client.query(`
+      CREATE TEMP TABLE region (
+        id NUMERIC(4) PRIMARY KEY,
+        name VARCHAR(50)
+      ) ON COMMIT DROP;
+      INSERT INTO pg_temp.region VALUES (1, 'Europe'), (2, 'Americas'), (3, 'Asia'), (4, 'Middle East and Africa');
+    `);
+  }
+
+  // If the challenge itself is testing `CREATE TABLE <name>`, drop the pre-seeded temp table first
+  for (const tbl of targetsToCreateFresh) {
+    await client.query(`DROP TABLE IF EXISTS pg_temp.${quoteIdent(tbl)} CASCADE`);
+  }
 }
 
-async function snapshotState(client: PoolClient, tables: string[]): Promise<TableState[]> {
-  const state: TableState[] = [];
-  for (const name of tables) {
+async function snapshotState(client: PoolClient): Promise<SandboxSnapshot> {
+  const tblRes = await client.query<{ oid: number; relname: string }>(`
+    SELECT c.oid, c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname LIKE 'pg_temp%' AND c.relkind = 'r'
+    ORDER BY c.relname
+  `);
+
+  const tables: TableState[] = [];
+  for (const row of tblRes.rows) {
+    const name = row.relname;
     const q = quoteIdent(name);
-    const exists = await client.query(`SELECT to_regclass($1::text) IS NOT NULL AS present`, [`pg_temp.${q}`]);
-    if (!exists.rows[0].present) {
-      state.push({ name, present: false, columns: [], rows: [] });
-      continue;
-    }
-    const res = await client.query({ text: `SELECT * FROM pg_temp.${q} LIMIT ${FETCH_LIMIT}`, rowMode: 'array' });
-    state.push({ name, present: true, columns: res.fields.map((f) => f.name), rows: res.rows as unknown[][] });
+
+    const colRes = await client.query<{ attname: string; data_type: string; attnotnull: boolean }>(
+      `SELECT a.attname, format_type(a.atttypid, a.atttypmod) AS data_type, a.attnotnull
+       FROM pg_attribute a
+       WHERE a.attrelid = $1 AND a.attnum > 0 AND NOT a.attisdropped
+       ORDER BY a.attnum`,
+      [row.oid]
+    );
+
+    const columnMeta: ColumnMeta[] = colRes.rows.map((c) => ({
+      name: c.attname.toLowerCase(),
+      type: normalizePgType(c.data_type),
+      notNull: Boolean(c.attnotnull),
+    }));
+
+    const conRes = await client.query<{ contype: string; def: string }>(
+      `SELECT c.contype, pg_get_constraintdef(c.oid, true) AS def
+       FROM pg_constraint c
+       WHERE c.conrelid = $1 AND c.contype IN ('p', 'u', 'f', 'c')`,
+      [row.oid]
+    );
+
+    const constraints = conRes.rows
+      .map((c) => `${c.contype}:${c.def.toLowerCase().replace(/pg_temp\./g, '').replace(/\s+/g, ' ').trim()}`)
+      .sort();
+
+    const dataRes = await client.query({
+      text: `SELECT * FROM pg_temp.${q} LIMIT ${FETCH_LIMIT}`,
+      rowMode: 'array',
+    });
+
+    tables.push({
+      name,
+      present: true,
+      columns: dataRes.fields.map((f) => f.name),
+      columnMeta,
+      constraints,
+      rows: dataRes.rows as unknown[][],
+    });
   }
-  return state;
+
+  const seqRes = await client.query<{
+    relname: string;
+    seqstart: string;
+    seqincrement: string;
+    seqmax: string;
+  }>(`
+    SELECT c.relname, s.seqstart::text, s.seqincrement::text, s.seqmax::text
+    FROM pg_sequence s
+    JOIN pg_class c ON c.oid = s.seqrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname LIKE 'pg_temp%'
+    ORDER BY c.relname
+  `);
+
+  const sequences: SequenceState[] = seqRes.rows.map((s) => ({
+    name: s.relname.toLowerCase(),
+    start: s.seqstart,
+    increment: s.seqincrement,
+    max: s.seqmax,
+  }));
+
+  return { tables, sequences };
+}
+
+function extractCreatedTables(statements: string[]): Set<string> {
+  const created = new Set<string>();
+  for (const stmt of statements) {
+    const m = /^\s*CREATE\s+(?:TEMP(?:ORARY)?\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?("?[A-Za-z_][\w$]*"?)/i.exec(
+      stripLeadingCommentsAndWhitespace(stmt)
+    );
+    if (m) {
+      created.add(m[1].replace(/"/g, '').toLowerCase());
+    }
+  }
+  return created;
 }
 
 /** Runs the statements inside a sandboxed transaction that ALWAYS ends in ROLLBACK. */
-async function runSandboxed(client: PoolClient, statements: string[], captureState: boolean): Promise<SandboxRun> {
+async function runSandboxed(
+  client: PoolClient,
+  statements: string[],
+  captureState: boolean,
+  targetsToCreateFresh: Set<string> = new Set()
+): Promise<SandboxRun> {
   assertStatementsAllowed(statements);
 
   await client.query('BEGIN');
   try {
     await client.query(`SET LOCAL statement_timeout = '${STATEMENT_TIMEOUT_MS}ms'`);
-    const tables = await prepareSandbox(client);
-    const before = captureState ? await snapshotState(client, tables) : null;
+    await prepareSandbox(client, targetsToCreateFresh);
+    await client.query('SAVEPOINT __grader_root');
+
+    const before = captureState ? await snapshotState(client) : null;
+    const stepFingerprints: string[] = [];
+    const tclEvents: string[] = [];
 
     let result: QueryOutput | null = null;
     for (let i = 0; i < statements.length; i++) {
       const stmt = statements[i];
-      if (i === statements.length - 1 && isRowReturning(stmt)) result = await runCursor(client, stmt);
-      else await client.query(stmt);
+      const cleaned = stripLeadingCommentsAndWhitespace(stmt).trim();
+      const word = firstWord(cleaned);
+
+      if (word === 'savepoint') {
+        const spMatch = /^SAVEPOINT\s+([A-Za-z_][\w$]*)\s*$/i.exec(cleaned);
+        if (!spMatch || spMatch[1].toLowerCase().startsWith('__grader')) {
+          throw new Error('Invalid SAVEPOINT name.');
+        }
+        await client.query(`SAVEPOINT ${quoteIdent(spMatch[1].toLowerCase())}`);
+        tclEvents.push(`SAVEPOINT:${spMatch[1].toLowerCase()}`);
+      } else if (word === 'rollback') {
+        const rbToMatch = /^ROLLBACK\s+TO(?:\s+SAVEPOINT)?\s+([A-Za-z_][\w$]*)\s*$/i.exec(cleaned);
+        if (rbToMatch) {
+          const spName = rbToMatch[1].toLowerCase();
+          await client.query(`ROLLBACK TO SAVEPOINT ${quoteIdent(spName)}`);
+          tclEvents.push(`ROLLBACK_TO:${spName}`);
+        } else if (/^ROLLBACK(?:\s+WORK|\s+TRANSACTION)?\s*$/i.test(cleaned)) {
+          await client.query('ROLLBACK TO SAVEPOINT __grader_root');
+          await client.query('SAVEPOINT __grader_root');
+          tclEvents.push('ROLLBACK');
+        } else {
+          throw new Error('Unsupported ROLLBACK syntax.');
+        }
+      } else if (word === 'commit') {
+        await client.query('SAVEPOINT __grader_commit_marker');
+        tclEvents.push('COMMIT');
+      } else if (i === statements.length - 1 && isRowReturning(cleaned)) {
+        result = await runCursor(client, stmt);
+      } else {
+        await client.query(stmt);
+      }
+
+      if (captureState) {
+        const snap = await snapshotState(client);
+        stepFingerprints.push(snapshotFingerprint(snap));
+      }
     }
 
-    const after = captureState ? await snapshotState(client, tables) : null;
+    const after = captureState ? await snapshotState(client) : null;
     await client.query('ROLLBACK');
-    return { result, before, after };
+    return { result, before, after, stepFingerprints, tclEvents };
   } catch (err) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw err;
@@ -530,7 +1035,12 @@ async function runSandboxed(client: PoolClient, statements: string[], captureSta
 // Grading
 // ---------------------------------------------------------------------------
 
-async function gradeByOutput(client: PoolClient, refStatements: string[], submittedStatements: string[], start: number): Promise<GradeResult> {
+async function gradeByOutput(
+  client: PoolClient,
+  refStatements: string[],
+  submittedStatements: string[],
+  start: number
+): Promise<GradeResult> {
   let ref: QueryOutput;
   try {
     ref = (await runSandboxed(client, refStatements, false)).result || { columns: [], rows: [] };
@@ -548,10 +1058,19 @@ async function gradeByOutput(client: PoolClient, refStatements: string[], submit
 
   if (!submitted) {
     return {
-      passed: false, status: 'WRONG_ANSWER',
-      output: "Your script executed, but its final statement didn't return any rows — this challenge expects the last statement to be a query (like SELECT) that returns data.",
-      errorMessage: '', runtimeMs: Date.now() - start,
-      resultColumns: [], resultRows: [], totalRows: 0, expectedRowCount: null, failureReason: 'NOT_ROW_RETURNING',
+      passed: false,
+      status: 'WRONG_ANSWER',
+      output:
+        "Your script executed, but its final statement didn't return any rows — this challenge expects the last statement to be a query (like SELECT) that returns data.",
+      errorMessage: '',
+      runtimeMs: Date.now() - start,
+      resultColumns: [],
+      resultRows: [],
+      expectedColumns: ref.columns,
+      expectedRows: ref.rows.slice(0, DISPLAY_LIMIT),
+      totalRows: 0,
+      expectedRowCount: ref.rows.length,
+      failureReason: 'NOT_ROW_RETURNING',
     };
   }
 
@@ -562,20 +1081,32 @@ async function gradeByOutput(client: PoolClient, refStatements: string[], submit
   return {
     passed,
     status: passed ? 'ACCEPTED' : 'WRONG_ANSWER',
-    output: passed ? `Correct: ${submitted.rows.length} row(s) match the expected result.` : `Wrong answer (${failureReason}).`,
-    errorMessage: '', runtimeMs: Date.now() - start,
-    resultColumns: submitted.columns, resultRows: submitted.rows.slice(0, DISPLAY_LIMIT),
-    totalRows: submitted.rows.length, expectedRowCount: ref.rows.length, failureReason,
+    output: passed
+      ? `Correct: ${submitted.rows.length} row(s) match the expected result.`
+      : `Wrong answer (${failureReason}).`,
+    errorMessage: '',
+    runtimeMs: Date.now() - start,
+    resultColumns: submitted.columns,
+    resultRows: submitted.rows.slice(0, DISPLAY_LIMIT),
+    expectedColumns: ref.columns,
+    expectedRows: ref.rows.slice(0, DISPLAY_LIMIT),
+    totalRows: submitted.rows.length,
+    expectedRowCount: ref.rows.length,
+    failureReason,
   };
 }
 
-/** For INSERT / UPDATE / DELETE references: the student's statements and the reference run in
- *  separate sandboxes that both start from identical, untouched data; the resulting table data
- *  is what gets compared. */
-async function gradeByState(client: PoolClient, refStatements: string[], submittedStatements: string[], start: number): Promise<GradeResult> {
+async function gradeByState(
+  client: PoolClient,
+  refStatements: string[],
+  submittedStatements: string[],
+  start: number
+): Promise<GradeResult> {
+  const targetsToCreateFresh = extractCreatedTables(refStatements);
+
   let refRun: SandboxRun;
   try {
-    refRun = await runSandboxed(client, refStatements, true);
+    refRun = await runSandboxed(client, refStatements, true, targetsToCreateFresh);
   } catch (refErr) {
     console.error('Reference SQL failed to run:', refErr);
     return emptyResult(start, 'RUNTIME_ERROR', REFERENCE_FAILED);
@@ -583,44 +1114,56 @@ async function gradeByState(client: PoolClient, refStatements: string[], submitt
 
   let subRun: SandboxRun;
   try {
-    subRun = await runSandboxed(client, submittedStatements, true);
+    subRun = await runSandboxed(client, submittedStatements, true, targetsToCreateFresh);
   } catch (dbErr) {
     return failureFromError(start, dbErr);
   }
 
-  const submittedAfter = subRun.after || [];
-  const expectedAfter = refRun.after || [];
-  const failureReason = compareStates(submittedAfter, expectedAfter);
+  const { reason: failureReason, detail } = compareSnapshots(subRun, refRun);
   const passed = failureReason === null;
 
-  // Show the student the table their statement actually changed.
-  const changedName = firstChangedTable(subRun.before || [], submittedAfter);
-  const changed = changedName ? submittedAfter.find((t) => t.name === changedName) : undefined;
-  const expectedChanged = changedName ? expectedAfter.find((t) => t.name === changedName) : undefined;
+  const submittedTables = subRun.after ? subRun.after.tables : [];
+  const expectedTables = refRun.after ? refRun.after.tables : [];
+  const beforeTables = subRun.before ? subRun.before.tables : [];
+
+  const changedName =
+    firstChangedTable(beforeTables, submittedTables) ||
+    firstChangedTable(refRun.before ? refRun.before.tables : [], expectedTables);
+
+  const changed = changedName ? submittedTables.find((t) => t.name === changedName) : undefined;
+  const expectedChanged = changedName ? expectedTables.find((t) => t.name === changedName) : undefined;
 
   return {
     passed,
     status: passed ? 'ACCEPTED' : 'WRONG_ANSWER',
-    output: passed ? 'Correct: the data in the tables matches the expected result.' : `Wrong answer (${failureReason}) — the data after your statement doesn't match what's expected.`,
-    errorMessage: '', runtimeMs: Date.now() - start,
+    output: passed
+      ? 'Correct: the database schema, constraints, and table data match the expected result.'
+      : `Wrong answer (${failureReason}) — ${detail || "the state after your statement doesn't match what's expected."}`,
+    errorMessage: '',
+    runtimeMs: Date.now() - start,
     resultColumns: changed ? changed.columns : [],
     resultRows: changed ? changed.rows.slice(0, DISPLAY_LIMIT) : [],
+    expectedColumns: expectedChanged ? expectedChanged.columns : [],
+    expectedRows: expectedChanged ? expectedChanged.rows.slice(0, DISPLAY_LIMIT) : [],
     totalRows: changed ? changed.rows.length : 0,
     expectedRowCount: expectedChanged ? expectedChanged.rows.length : null,
     failureReason,
   };
 }
 
-/** Single entry point. A reference answer that ends in a SELECT is graded by its output;
- *  anything else (INSERT, UPDATE, DELETE, ...) is graded by the resulting table data. */
-export async function gradeSqlSubmission(challenge: { referenceAnswer: string | null }, submittedSql: string): Promise<GradeResult> {
+export async function gradeSqlSubmission(
+  challenge: { referenceAnswer: string | null },
+  submittedSql: string
+): Promise<GradeResult> {
   const start = Date.now();
 
   const submittedStatements = normalizeSql(submittedSql);
   if (submittedStatements.length === 0) return emptyResult(start, 'RUNTIME_ERROR', 'Write a query first.');
 
   const refStatements = normalizeSql(challenge.referenceAnswer || '');
-  if (refStatements.length === 0) return emptyResult(start, 'RUNTIME_ERROR', 'This challenge has no reference answer yet. Please report it.');
+  if (refStatements.length === 0) {
+    return emptyResult(start, 'RUNTIME_ERROR', 'This challenge has no reference answer yet. Please report it.');
+  }
 
   const acquired = await graderPool.connect().catch((e: Error) => e);
   if (acquired instanceof Error) {
@@ -640,46 +1183,71 @@ export async function gradeSqlSubmission(challenge: { referenceAnswer: string | 
   }
 }
 
-/** Kept for older callers. */
 export async function runSqlGraded(referenceSql: string, submittedSql: string): Promise<GradeResult> {
   return gradeSqlSubmission({ referenceAnswer: referenceSql }, submittedSql);
 }
 
-/** Used by the Admin "Test Query" button, the public Playground and the sample-data preview.
- *  Same sandbox as grading, so nothing is ever saved. */
-export async function testSqlQuery(sql: string): Promise<{ ok: boolean; columns: string[]; rows: unknown[][]; message: string; runtimeMs: number }> {
+export async function testSqlQuery(sql: string): Promise<{
+  ok: boolean;
+  columns: string[];
+  rows: unknown[][];
+  message: string;
+  runtimeMs: number;
+}> {
   const start = Date.now();
   const statements = normalizeSql(sql);
-  if (statements.length === 0) return { ok: false, columns: [], rows: [], message: 'Write a query first.', runtimeMs: Date.now() - start };
+  if (statements.length === 0) {
+    return { ok: false, columns: [], rows: [], message: 'Write a query first.', runtimeMs: Date.now() - start };
+  }
 
   const acquired = await graderPool.connect().catch((e: Error) => e);
-  if (acquired instanceof Error) return { ok: false, columns: [], rows: [], message: `Could not connect: ${acquired.message}`, runtimeMs: Date.now() - start };
+  if (acquired instanceof Error) {
+    return { ok: false, columns: [], rows: [], message: `Could not connect: ${acquired.message}`, runtimeMs: Date.now() - start };
+  }
   const client = acquired;
 
   try {
     const dataChanging = !isRowReturning(statements[statements.length - 1]);
-    const run = await runSandboxed(client, statements, dataChanging);
+    const targetsToCreateFresh = extractCreatedTables(statements);
+    const run = await runSandboxed(client, statements, dataChanging, targetsToCreateFresh);
 
     if (run.result) {
-      return { ok: true, columns: run.result.columns, rows: run.result.rows.slice(0, DISPLAY_LIMIT), message: `${run.result.rows.length} row(s) returned.`, runtimeMs: Date.now() - start };
+      return {
+        ok: true,
+        columns: run.result.columns,
+        rows: run.result.rows.slice(0, DISPLAY_LIMIT),
+        message: `${run.result.rows.length} row(s) returned.`,
+        runtimeMs: Date.now() - start,
+      };
     }
 
-    const changedName = run.before && run.after ? firstChangedTable(run.before, run.after) : null;
-    if (changedName && run.after && run.before) {
-      const afterTable = run.after.find((t) => t.name === changedName);
-      const beforeTable = run.before.find((t) => t.name === changedName);
+    const beforeTables = run.before ? run.before.tables : [];
+    const afterTables = run.after ? run.after.tables : [];
+    const changedName = firstChangedTable(beforeTables, afterTables);
+    if (changedName) {
+      const afterTable = afterTables.find((t) => t.name === changedName);
       if (afterTable && afterTable.present) {
         return {
-          ok: true, columns: afterTable.columns, rows: afterTable.rows.slice(0, DISPLAY_LIMIT),
-          message: `Statement(s) executed. Table "${changedName}" now has ${afterTable.rows.length} row(s) (was ${beforeTable ? beforeTable.rows.length : 0}). Nothing is saved — the sandbox resets after every run.`,
+          ok: true,
+          columns: afterTable.columns,
+          rows: afterTable.rows.slice(0, DISPLAY_LIMIT),
+          message: `Statement(s) executed on "${changedName}" (${afterTable.columns.length} column(s), ${afterTable.rows.length} row(s)). Sandbox resets after every run.`,
           runtimeMs: Date.now() - start,
         };
       }
     }
-    return { ok: true, columns: [], rows: [], message: 'Statement(s) executed successfully (no rows returned).', runtimeMs: Date.now() - start };
+    return {
+      ok: true,
+      columns: [],
+      rows: [],
+      message: 'Statement(s) executed successfully (no rows returned).',
+      runtimeMs: Date.now() - start,
+    };
   } catch (err: any) {
     return {
-      ok: false, columns: [], rows: [],
+      ok: false,
+      columns: [],
+      rows: [],
       message: err && err.code === '57014' ? 'Query took too long to execute.' : describeError(err),
       runtimeMs: Date.now() - start,
     };
