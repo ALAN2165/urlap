@@ -1,40 +1,47 @@
 'use client';
-import { useChallengeChatLifecycle } from '@/hooks/useChallengeChatLifecycle';
+
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowLeft, Lock, Loader2, Zap, Flag } from 'lucide-react';
+import { ArrowLeft, Lock, Loader2, Zap, Flag, Crown, Flame, RotateCcw, Check } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { ChallengeDetail, LabDetail, Submission } from '@/types';
+import { useExtra } from '@/i18n/extra';
+import { useChallengeChatLifecycle } from '@/hooks/useChallengeChatLifecycle';
 import CodeEditor from '@/components/editor/CodeEditor';
 import OutputPanel from '@/components/editor/OutputPanel';
 import HintPanel from '@/components/challenge/HintPanel';
 import SchemaViewer from '@/components/challenge/SchemaViewer';
-import ReportChallengeModal from '@/components/challenge/ReportChallengeModal';
 import LiveSampleDataViewer from '@/components/challenge/LiveSampleDataViewer';
+import ReportChallengeModal from '@/components/challenge/ReportChallengeModal';
+import { AuraFrame, EmberField } from '@/components/challenge/BossAura';
 
 const POLL_INTERVAL_MS = 600;
 const MAX_POLL_ATTEMPTS = 50;
 const REQUEST_TIMEOUT_MS = 10000;
-const PASTE_FLAG_MIN_LENGTH = 20; // ignore trivial pastes like a single word
+const PASTE_FLAG_MIN_LENGTH = 20;
+const DRAFT_SAVE_DELAY_MS = 400;
+
+const draftKey = (userId: string | undefined, slug: string) => `urlap:draft:${userId ?? 'anon'}:${slug}`;
 
 export default function ChallengeSolvePage() {
   const { labSlug, challengeSlug } = useParams<{ labSlug: string; challengeSlug: string }>();
   const t = useTranslations('challenge');
+  const x = useExtra();
   const locale = useLocale();
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
 
- const { data: challenge, isError } = useQuery<ChallengeDetail>({
+  const { data: challenge, isError } = useQuery<ChallengeDetail>({
     queryKey: ['challenge', challengeSlug],
     queryFn: async () => (await api.get(`/challenges/${challengeSlug}`)).data,
   });
-  useChallengeChatLifecycle(challenge?.id);
-
   const { data: lab } = useQuery<LabDetail>({
     queryKey: ['lab', labSlug],
     queryFn: async () => (await api.get(`/challenges/labs/${labSlug}`)).data,
@@ -44,44 +51,79 @@ export default function ChallengeSolvePage() {
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [running, setRunning] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
 
   const cancelRef = useRef({ cancelled: false });
   const currentIdRef = useRef<string | undefined>(undefined);
   currentIdRef.current = challenge?.id;
-
-  // Anti-cheating signal tracking — reset per challenge and per attempt.
+  const starterRef = useRef('');
   const pasteDetectedRef = useRef(false);
   const tabSwitchCountRef = useRef(0);
   const startTimeRef = useRef(Date.now());
+
+  const key = draftKey(user?.id, challengeSlug);
+
+  useChallengeChatLifecycle(challenge?.id);
 
   useEffect(() => {
     cancelRef.current.cancelled = false;
     return () => { cancelRef.current.cancelled = true; };
   }, []);
 
+  // Load the challenge: restore this student's saved draft if there is one, otherwise the starter code.
   useEffect(() => {
     if (!challenge) return;
-    setCode(challenge.starterCodes[0]?.code ?? '-- write your SQL query here\n');
+    const starter = challenge.starterCodes[0]?.code ?? '-- write your SQL query here\n';
+    starterRef.current = starter;
+
+    let draft: string | null = null;
+    try { draft = localStorage.getItem(key); } catch { /* storage unavailable */ }
+    if (draft && draft.trim() && draft !== starter) {
+      setCode(draft);
+      setHasDraft(true);
+      toast.info(x('draftRestored'));
+    } else {
+      setCode(starter);
+      setHasDraft(false);
+    }
+
     setSubmission(null);
     setRunning(false);
     pasteDetectedRef.current = false;
     tabSwitchCountRef.current = 0;
     startTimeRef.current = Date.now();
-  }, [challenge?.id]);
+    setHydrated(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [challenge?.id, user?.id]);
 
-  // Counts how many times the user left this tab while on the current
-  // attempt — tracked purely for admin visibility, never used to block
-  // or auto-penalize anything.
+  // Auto-save (debounced). Nothing is written until the draft has been restored, so it can't be overwritten by the starter.
   useEffect(() => {
-    function handleVisibility() {
-      if (document.hidden) tabSwitchCountRef.current += 1;
-    }
+    if (!hydrated) return;
+    const id = setTimeout(() => {
+      try {
+        if (code === starterRef.current || !code.trim()) { localStorage.removeItem(key); setHasDraft(false); }
+        else { localStorage.setItem(key, code); setHasDraft(true); }
+      } catch { /* storage full or unavailable */ }
+    }, DRAFT_SAVE_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [code, hydrated, key]);
+
+  useEffect(() => {
+    function handleVisibility() { if (document.hidden) tabSwitchCountRef.current += 1; }
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
   function handlePaste(pastedLength: number) {
     if (pastedLength > PASTE_FLAG_MIN_LENGTH) pasteDetectedRef.current = true;
+  }
+
+  function resetCode() {
+    if (!confirm(x('resetConfirm'))) return;
+    try { localStorage.removeItem(key); } catch { /* ignore */ }
+    setCode(starterRef.current);
+    setHasDraft(false);
   }
 
   async function pollUntilDone(id: string): Promise<Submission | null> {
@@ -112,8 +154,6 @@ export default function ChallengeSolvePage() {
     setRunning(true);
     setSubmission(null);
 
-    // Snapshot this attempt's anti-cheat signals, then reset immediately so
-    // the NEXT attempt starts tracking fresh instead of accumulating.
     const isPasted = pasteDetectedRef.current;
     const timeSpentSeconds = Math.round((Date.now() - startTimeRef.current) / 1000);
     const tabSwitches = tabSwitchCountRef.current;
@@ -122,20 +162,14 @@ export default function ChallengeSolvePage() {
     startTimeRef.current = Date.now();
 
     try {
-      const { data } = await api.post(
-        '/submissions',
-        { challengeId: challenge.id, language: 'SQL', code, isPasted, timeSpentSeconds, tabSwitches },
-        { timeout: REQUEST_TIMEOUT_MS }
-      );
+      const { data } = await api.post('/submissions', { challengeId: challenge.id, language: 'SQL', code, isPasted, timeSpentSeconds, tabSwitches }, { timeout: REQUEST_TIMEOUT_MS });
       const finished = await pollUntilDone(data.submissionId);
-
       if (cancelRef.current.cancelled || currentIdRef.current !== startedFor) return;
 
       if (!finished) {
         setSubmission({ id: 'timeout', status: 'TIME_LIMIT_EXCEEDED', errorMessage: t('gradingTimeout'), pointsAwarded: 0 });
         return;
       }
-
       setSubmission(finished);
       if (finished.status === 'ACCEPTED') void refreshProgress();
     } catch (err: any) {
@@ -160,8 +194,10 @@ export default function ChallengeSolvePage() {
     );
   }
 
-  const idx = lab ? lab.challenges.findIndex((c) => c.slug === challengeSlug) : -1;
-  const next = idx >= 0 ? lab?.challenges[idx + 1] : undefined;
+  const isBoss = !!challenge.isBoss;
+  const ordered = lab ? [...lab.challenges, ...(lab.boss ? [lab.boss] : [])].sort((a, b) => a.orderIndex - b.orderIndex) : [];
+  const idx = ordered.findIndex((c) => c.slug === challengeSlug);
+  const next = idx >= 0 ? ordered[idx + 1] : undefined;
   const nextHref = submission?.status === 'ACCEPTED' && next && !next.locked ? `/challenges/${labSlug}/${next.slug}` : undefined;
 
   const title = locale === 'ar' ? challenge.titleAr : challenge.titleEn;
@@ -172,8 +208,12 @@ export default function ChallengeSolvePage() {
     : challenge.difficulty === 'HARD' ? t('difficultyHard')
     : t('difficultyExpert');
 
+  const conquered = isBoss && submission?.status === 'ACCEPTED' && submission.pointsAwarded > 0;
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 md:py-10">
+      {isBoss && <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,rgba(244,63,94,0.2),transparent_60%),radial-gradient(ellipse_at_bottom,rgba(124,58,237,0.15),transparent_55%)]" />}
+
       <Link href={`/challenges/${labSlug}`} className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-purple-600 dark:text-slate-400 dark:hover:text-purple-400 md:mb-6">
         <ArrowLeft size={16} className="rtl:rotate-180" />
         {t('backToLab')}
@@ -181,39 +221,79 @@ export default function ChallengeSolvePage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-          <div className="glass mb-6 rounded-3xl p-5 sm:p-7">
-            <h1 className="mb-3 text-xl font-extrabold text-slate-900 dark:text-white sm:text-2xl">{title}</h1>
-            <div className="mb-5 flex items-center gap-3">
-              <span className="rounded-full bg-purple-500/10 px-3 py-1 text-xs font-bold text-purple-700 dark:text-purple-400">{difficultyLabel}</span>
-              <span className="text-sm font-bold text-slate-500 dark:text-slate-400">{challenge.points} {t('pts')}</span>
+          {isBoss ? (
+            <AuraFrame className="mb-6">
+              <div className="relative bg-gradient-to-br from-slate-950 via-[#1a0a14] to-slate-950 p-5 sm:p-7">
+                <EmberField count={14} />
+                <div className="relative z-10">
+                  <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.2em] text-amber-300">
+                    <Crown size={12} /> {x('bossLabel')}
+                  </span>
+                  <h1 className="mb-3 bg-gradient-to-r from-amber-300 via-rose-400 to-purple-400 bg-clip-text text-2xl font-black text-transparent sm:text-3xl">{title}</h1>
+                  <div className="mb-5 flex items-center gap-3">
+                    <span className="flex items-center gap-1 rounded-full bg-rose-500/15 px-3 py-1 text-xs font-bold text-rose-300"><Flame size={12} />{difficultyLabel}</span>
+                    <span className="text-sm font-bold text-amber-300">{challenge.points} {t('pts')}</span>
+                  </div>
+                  <p className="whitespace-pre-line leading-relaxed text-slate-200">{description}</p>
+                </div>
+              </div>
+            </AuraFrame>
+          ) : (
+            <div className="glass mb-6 rounded-3xl p-5 sm:p-7">
+              <h1 className="mb-3 text-xl font-extrabold text-slate-900 dark:text-white sm:text-2xl">{title}</h1>
+              <div className="mb-5 flex items-center gap-3">
+                <span className="rounded-full bg-purple-500/10 px-3 py-1 text-xs font-bold text-purple-700 dark:text-purple-400">{difficultyLabel}</span>
+                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">{challenge.points} {t('pts')}</span>
+              </div>
+              <p className="whitespace-pre-line leading-relaxed text-slate-700 dark:text-slate-300">{description}</p>
             </div>
-            <p className="whitespace-pre-line leading-relaxed text-slate-700 dark:text-slate-300">{description}</p>
-          </div>
+          )}
 
-         <SchemaViewer schemaJson={challenge.schemaJson} />
-<LiveSampleDataViewer challengeSlug={challengeSlug} />
-<HintPanel hints={challenge.hints} />
+          <SchemaViewer schemaJson={challenge.schemaJson} />
+          <LiveSampleDataViewer challengeSlug={challengeSlug} />
+          <HintPanel hints={challenge.hints} />
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.15 }}>
           <div className="mb-3 flex items-center justify-between gap-3">
-            <button
-              onClick={() => setReportOpen(true)}
-              className="flex items-center gap-1.5 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-500 hover:border-amber-400 hover:text-amber-600 dark:border-slate-700/50 dark:text-slate-400"
-            >
-              <Flag size={13} />
-              {t('report')}
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setReportOpen(true)} className="flex items-center gap-1.5 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-500 hover:border-amber-400 hover:text-amber-600 dark:border-slate-700/50 dark:text-slate-400">
+                <Flag size={13} />
+                {t('report')}
+              </button>
+              {hasDraft && (
+                <button onClick={resetCode} title={x('resetConfirm')} className="flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-slate-400 hover:text-purple-500 dark:text-slate-500">
+                  <RotateCcw size={12} />
+                  {x('resetCode')}
+                </button>
+              )}
+            </div>
             <button
               onClick={handleSubmit}
               disabled={running}
-              className="flex items-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-purple-800 px-6 py-2.5 font-semibold text-white shadow-[0_0_18px_rgba(147,51,234,0.3)] transition-all duration-300 hover:-translate-y-1 disabled:opacity-60 disabled:hover:translate-y-0"
+              className={`flex items-center gap-2 rounded-full px-6 py-2.5 font-semibold text-white transition-all duration-300 hover:-translate-y-1 disabled:opacity-60 disabled:hover:translate-y-0 ${isBoss ? 'bg-gradient-to-r from-rose-600 via-red-600 to-amber-500 shadow-[0_0_24px_rgba(244,63,94,0.5)]' : 'bg-gradient-to-r from-purple-600 to-purple-800 shadow-[0_0_18px_rgba(147,51,234,0.3)]'}`}
             >
               {running ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
               {running ? t('checking') : t('submitQuery')}
             </button>
           </div>
-          <CodeEditor value={code} onChange={setCode} language="SQL" onPaste={handlePaste} />
+
+          <div className={isBoss ? 'rounded-2xl shadow-[0_0_45px_-8px_rgba(244,63,94,0.45)] ring-1 ring-rose-500/30' : ''}>
+            <CodeEditor value={code} onChange={setCode} language="SQL" onPaste={handlePaste} />
+          </div>
+          {hasDraft && (
+            <div className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-400 dark:text-slate-500"><Check size={11} /> {x('draftSaved')}</div>
+          )}
+
+          {conquered && (
+            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 14 }}
+              className="relative mt-4 overflow-hidden rounded-2xl border border-amber-400/40 bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-purple-500/15 p-5 text-center">
+              <Crown size={28} className="mx-auto mb-2 text-amber-400" />
+              <div className="bg-gradient-to-r from-amber-300 via-rose-400 to-purple-400 bg-clip-text text-lg font-black text-transparent">{x('bossVictory')}</div>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{x('bossVictoryBody')}</p>
+            </motion.div>
+          )}
+
           <OutputPanel submission={submission} running={running} nextHref={nextHref} />
         </motion.div>
       </div>

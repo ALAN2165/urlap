@@ -3,11 +3,43 @@ import { Pool } from 'pg';
 
 const GRADER_PASSWORD = process.env.SQL_GRADER_PASSWORD || 'urlap_grader_pw_change_me';
 
+const COMPAT_FUNCTIONS: string[] = [
+  `CREATE OR REPLACE FUNCTION playground.nvl(text, text) RETURNS text AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.nvl(integer, integer) RETURNS integer AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.nvl(bigint, bigint) RETURNS bigint AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.nvl(numeric, numeric) RETURNS numeric AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.nvl(date, date) RETURNS date AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.nvl(timestamp, timestamp) RETURNS timestamp AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.nvl(boolean, boolean) RETURNS boolean AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.nvl2(anyelement, text, text) RETURNS text AS $$ SELECT CASE WHEN $1 IS NOT NULL THEN $2 ELSE $3 END; $$ LANGUAGE sql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.nvl2(anyelement, integer, integer) RETURNS integer AS $$ SELECT CASE WHEN $1 IS NOT NULL THEN $2 ELSE $3 END; $$ LANGUAGE sql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.nvl2(anyelement, numeric, numeric) RETURNS numeric AS $$ SELECT CASE WHEN $1 IS NOT NULL THEN $2 ELSE $3 END; $$ LANGUAGE sql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.decode(VARIADIC args anyarray)
+   RETURNS anyelement AS $$
+   DECLARE
+     i integer := 2;
+     n integer := array_length(args, 1);
+   BEGIN
+     WHILE i < n LOOP
+       IF args[1] IS NOT DISTINCT FROM args[i] THEN RETURN args[i + 1]; END IF;
+       i := i + 2;
+     END LOOP;
+     IF i = n THEN RETURN args[n]; END IF;
+     RETURN NULL;
+   END;
+   $$ LANGUAGE plpgsql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.add_months(date, integer) RETURNS date AS $$ SELECT ($1 + ($2 || ' months')::interval)::date; $$ LANGUAGE sql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.months_between(date, date) RETURNS numeric AS $$ SELECT (EXTRACT(YEAR FROM age($1, $2)) * 12 + EXTRACT(MONTH FROM age($1, $2)))::numeric; $$ LANGUAGE sql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.trunc(timestamp) RETURNS date AS $$ SELECT $1::date; $$ LANGUAGE sql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.instr(text, text) RETURNS integer AS $$ SELECT POSITION($2 IN $1); $$ LANGUAGE sql IMMUTABLE`,
+  `CREATE OR REPLACE FUNCTION playground.instr(text, text, integer) RETURNS integer AS $$ SELECT CASE WHEN POSITION($2 IN SUBSTRING($1 FROM $3)) = 0 THEN 0 ELSE POSITION($2 IN SUBSTRING($1 FROM $3)) + $3 - 1 END; $$ LANGUAGE sql IMMUTABLE`,
+];
+
 async function main() {
   const admin = new Pool({ connectionString: process.env.DATABASE_URL });
   const dbName = new URL(process.env.DATABASE_URL || '').pathname.replace('/', '');
 
-  console.log('🔧 Setting up SQL playground schema, role, and grants...');
+  console.log('🔧 Setting up SQL playground schema, role and grants...');
 
   await admin.query(`
     DO $$
@@ -22,8 +54,8 @@ async function main() {
   `);
 
   await admin.query(`CREATE SCHEMA IF NOT EXISTS playground;`);
-  await admin.query(`DROP TABLE IF EXISTS playground.employees;`);
-  await admin.query(`DROP TABLE IF EXISTS playground.departments;`);
+  await admin.query(`DROP TABLE IF EXISTS playground.employees CASCADE;`);
+  await admin.query(`DROP TABLE IF EXISTS playground.departments CASCADE;`);
 
   await admin.query(`
     CREATE TABLE playground.employees (
@@ -37,11 +69,10 @@ async function main() {
       department_id   INTEGER
     );
   `);
-
   await admin.query(`
     CREATE TABLE playground.departments (
       department_id    INTEGER PRIMARY KEY,
-      department_name VARCHAR(30) NOT NULL,
+      department_name  VARCHAR(30) NOT NULL,
       manager_id       INTEGER,
       location_id      INTEGER
     );
@@ -49,19 +80,23 @@ async function main() {
 
   await admin.query(`REVOKE ALL ON SCHEMA public FROM urlap_grader;`);
   await admin.query(`REVOKE ALL ON ALL TABLES IN SCHEMA public FROM urlap_grader;`);
-  await admin.query(`GRANT USAGE ON SCHEMA playground TO urlap_grader;`);
+  await admin.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC;`);
 
-  // READ-ONLY on the real tables, on purpose. Every grading run copies these tables into
-  // private TEMP tables and executes the student's SQL against the copies, so INSERT / UPDATE /
-  // DELETE can never touch the real data, even if a transaction were somehow committed.
+  // The grader can only READ the real tables. Every run executes inside its own throw-away
+  // schema holding copies of them, and always ends in ROLLBACK, so nothing a student runs can persist.
+  await admin.query(`GRANT USAGE ON SCHEMA playground TO urlap_grader;`);
+  await admin.query(`REVOKE CREATE ON SCHEMA playground FROM urlap_grader;`);
   await admin.query(`GRANT SELECT ON ALL TABLES IN SCHEMA playground TO urlap_grader;`);
   await admin.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA playground GRANT SELECT ON TABLES TO urlap_grader;`);
-
   await admin.query(`ALTER ROLE urlap_grader SET search_path = playground;`);
   await admin.query(`ALTER ROLE urlap_grader SET statement_timeout = '8000';`);
-  await admin.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC;`);
-  await admin.query(`GRANT TEMP ON DATABASE "${dbName}" TO urlap_grader;`);
-  await admin.query(`GRANT CREATE ON SCHEMA playground TO urlap_grader;`);
+
+  // Needed so each run can create its private sandbox schema (always rolled back, never committed).
+  try {
+    await admin.query(`GRANT CREATE ON DATABASE "${dbName}" TO urlap_grader;`);
+  } catch (err) {
+    throw new Error(`Could not grant CREATE on database "${dbName}" to urlap_grader — the SQL sandbox cannot work without it: ${(err as Error).message}`);
+  }
   try {
     await admin.query(`GRANT USAGE ON LANGUAGE plpgsql TO urlap_grader;`);
   } catch (err) {
@@ -70,58 +105,17 @@ async function main() {
   try {
     await admin.query(`ALTER ROLE urlap_grader SET temp_file_limit = '64MB';`);
   } catch (err) {
-    console.warn('  (non-fatal) could not set temp_file_limit (needs superuser):', (err as Error).message);
+    console.warn('  (non-fatal) could not set temp_file_limit:', (err as Error).message);
   }
 
-  console.log('🧩 Installing SQL compatibility helper functions (NVL, NVL2, DECODE, date/string helpers)...');
-
+  console.log('🧩 Installing compatibility helper functions (NVL, NVL2, DECODE, ADD_MONTHS, ...)...');
   await admin.query(`DROP FUNCTION IF EXISTS playground.nvl(anyelement, anyelement);`);
   await admin.query(`DROP FUNCTION IF EXISTS playground.nvl2(anyelement, anyelement, anyelement);`);
-
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl(text, text) RETURNS text AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE;`);
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl(integer, integer) RETURNS integer AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE;`);
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl(bigint, bigint) RETURNS bigint AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE;`);
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl(numeric, numeric) RETURNS numeric AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE;`);
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl(date, date) RETURNS date AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE;`);
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl(timestamp, timestamp) RETURNS timestamp AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE;`);
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl(boolean, boolean) RETURNS boolean AS $$ SELECT COALESCE($1, $2); $$ LANGUAGE sql IMMUTABLE;`);
-
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl2(anyelement, text, text) RETURNS text AS $$ SELECT CASE WHEN $1 IS NOT NULL THEN $2 ELSE $3 END; $$ LANGUAGE sql IMMUTABLE;`);
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl2(anyelement, integer, integer) RETURNS integer AS $$ SELECT CASE WHEN $1 IS NOT NULL THEN $2 ELSE $3 END; $$ LANGUAGE sql IMMUTABLE;`);
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.nvl2(anyelement, numeric, numeric) RETURNS numeric AS $$ SELECT CASE WHEN $1 IS NOT NULL THEN $2 ELSE $3 END; $$ LANGUAGE sql IMMUTABLE;`);
-
-  await admin.query(`
-    CREATE OR REPLACE FUNCTION playground.decode(VARIADIC args anyarray)
-    RETURNS anyelement AS $$
-    DECLARE
-      i integer := 2;
-      n integer := array_length(args, 1);
-    BEGIN
-      WHILE i < n LOOP
-        IF args[1] IS NOT DISTINCT FROM args[i] THEN
-          RETURN args[i + 1];
-        END IF;
-        i := i + 2;
-      END LOOP;
-      IF i = n THEN
-        RETURN args[n];
-      END IF;
-      RETURN NULL;
-    END;
-    $$ LANGUAGE plpgsql IMMUTABLE;
-  `);
-
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.add_months(date, integer) RETURNS date AS $$ SELECT ($1 + ($2 || ' months')::interval)::date; $$ LANGUAGE sql IMMUTABLE;`);
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.months_between(date, date) RETURNS numeric AS $$ SELECT (EXTRACT(YEAR FROM age($1, $2)) * 12 + EXTRACT(MONTH FROM age($1, $2)))::numeric; $$ LANGUAGE sql IMMUTABLE;`);
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.trunc(timestamp) RETURNS date AS $$ SELECT $1::date; $$ LANGUAGE sql IMMUTABLE;`);
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.instr(text, text) RETURNS integer AS $$ SELECT POSITION($2 IN $1); $$ LANGUAGE sql IMMUTABLE;`);
-  await admin.query(`CREATE OR REPLACE FUNCTION playground.instr(text, text, integer) RETURNS integer AS $$ SELECT CASE WHEN POSITION($2 IN SUBSTRING($1 FROM $3)) = 0 THEN 0 ELSE POSITION($2 IN SUBSTRING($1 FROM $3)) + $3 - 1 END; $$ LANGUAGE sql IMMUTABLE;`);
-
+  for (const sql of COMPAT_FUNCTIONS) await admin.query(sql);
   await admin.query(`GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA playground TO urlap_grader;`);
   await admin.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA playground GRANT EXECUTE ON FUNCTIONS TO urlap_grader;`);
 
-  console.log('🌱 Inserting dummy rows...');
-
+  console.log('🌱 Inserting sample rows...');
   await admin.query(`
     INSERT INTO playground.employees
       (employee_id, last_name, job_id, salary, hire_date, commission_pct, manager_id, department_id)
@@ -157,21 +151,21 @@ async function main() {
       (143, 'Matos',     'ST_CLERK',   2600, '2021-03-15', NULL, 106, 40);
   `);
 
-  // Department 30 is intentionally absent: Lab 3 Challenge 1 inserts it.
-  // Departments 70 and 80 intentionally have no employees: Lab 3 Challenge 6 (outer join) needs them.
+  // Department 30 is intentionally missing (Lab 3 Challenge 1 inserts it); 70 and 80 intentionally
+  // have no employees (Lab 3 Challenge 6, the outer join, needs them).
   await admin.query(`
     INSERT INTO playground.departments (department_id, department_name, manager_id, location_id)
     VALUES
-      (10, 'Administration',  100, 1700),
-      (20, 'Finance',         101, 1700),
-      (40, 'Shipping',        106, 1500),
-      (50, 'IT',              118, 1400),
-      (60, 'Supply Chain',    119, 1700),
+      (10, 'Administration',   100, 1700),
+      (20, 'Finance',          101, 1700),
+      (40, 'Shipping',         106, 1500),
+      (50, 'IT',               118, 1400),
+      (60, 'Supply Chain',     119, 1700),
       (70, 'Public Relations', NULL, 2700),
       (80, 'Marketing',        NULL, 1800);
   `);
 
-  console.log('✅ SQL playground ready: 29 employees, 7 departments, read-only grants, compatibility functions.');
+  console.log('✅ SQL playground ready: 29 employees, 7 departments, read-only grants, sandbox schema privileges.');
   await admin.end();
 }
 

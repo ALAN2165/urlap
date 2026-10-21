@@ -1,34 +1,33 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { prisma } from '../config/db';
-import { isChallengeLocked } from '../services/challenge.service';
+import { computeAccess, getChallengeAccess } from '../services/labProgress.service';
 import { testSqlQuery } from '../services/sqlGrader.service';
 
 const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+async function solvedSet(userId: string): Promise<Set<string>> {
+  const rows = await prisma.challengeCompletion.findMany({ where: { userId }, select: { challengeId: true } });
+  return new Set(rows.map((r) => r.challengeId));
+}
 
 export async function getLabs(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const labs = await prisma.lab.findMany({
       orderBy: { orderIndex: 'asc' },
-      include: { challenges: { select: { id: true } } },
+      include: { challenges: { orderBy: { orderIndex: 'asc' }, select: { id: true } } },
     });
-    const completions = await prisma.challengeCompletion.findMany({
-      where: { userId: req.userId! },
-      select: { challengeId: true },
-    });
-    const solved = new Set(completions.map((c) => c.challengeId));
+    const solved = await solvedSet(req.userId!);
 
-    res.json(
-      labs.map((lab) => ({
-        id: lab.id,
-        slug: lab.slug,
-        titleEn: lab.titleEn,
-        titleAr: lab.titleAr,
-        orderIndex: lab.orderIndex,
-        totalChallenges: lab.challenges.length,
-        solvedChallenges: lab.challenges.filter((c) => solved.has(c.id)).length,
-      }))
-    );
+    res.json(labs.map((lab) => {
+      const access = computeAccess(lab.challenges, solved);
+      const visible = lab.challenges.filter((c) => !(access.get(c.id)!).hidden); // a hidden Master Challenge isn't counted
+      return {
+        id: lab.id, slug: lab.slug, titleEn: lab.titleEn, titleAr: lab.titleAr, orderIndex: lab.orderIndex,
+        totalChallenges: visible.length,
+        solvedChallenges: visible.filter((c) => solved.has(c.id)).length,
+      };
+    }));
   } catch (err) { next(err); }
 }
 
@@ -43,20 +42,18 @@ export async function getLab(req: AuthRequest, res: Response, next: NextFunction
         },
       },
     });
+    const solved = await solvedSet(req.userId!);
+    const access = computeAccess(lab.challenges, solved);
 
-    const completions = await prisma.challengeCompletion.findMany({
-      where: { userId: req.userId!, challengeId: { in: lab.challenges.map((c) => c.id) } },
-      select: { challengeId: true },
+    const visible = lab.challenges
+      .filter((c) => !(access.get(c.id)!).hidden)
+      .map((c) => ({ ...c, solved: solved.has(c.id), locked: access.get(c.id)!.locked, isBoss: access.get(c.id)!.isBoss }));
+
+    res.json({
+      id: lab.id, slug: lab.slug, titleEn: lab.titleEn, titleAr: lab.titleAr,
+      challenges: visible.filter((c) => !c.isBoss),
+      boss: visible.find((c) => c.isBoss) || null,
     });
-    const solved = new Set(completions.map((c) => c.challengeId));
-
-    const challenges = lab.challenges.map((c, i) => ({
-      ...c,
-      solved: solved.has(c.id),
-      locked: i > 0 && !solved.has(lab.challenges[i - 1].id),
-    }));
-
-    res.json({ id: lab.id, slug: lab.slug, titleEn: lab.titleEn, titleAr: lab.titleAr, challenges });
   } catch (err) { next(err); }
 }
 
@@ -67,22 +64,14 @@ export async function getChallenge(req: AuthRequest, res: Response, next: NextFu
       include: { starterCodes: true, hints: { orderBy: { order: 'asc' } } },
     });
 
-    const locked = await isChallengeLocked(challenge.id, req.userId);
-    if (locked) {
-      // A locked challenge never leaks its description, schema, hints or code.
+    const access = await getChallengeAccess(challenge.id, req.userId);
+    if (access.hidden) return res.status(404).json({ error: 'Challenge not found.' }); // Master Challenge not earned yet
+
+    if (access.locked) {
       return res.json({
-        id: challenge.id,
-        slug: challenge.slug,
-        titleEn: challenge.titleEn,
-        titleAr: challenge.titleAr,
-        descriptionEn: '',
-        descriptionAr: '',
-        difficulty: challenge.difficulty,
-        points: challenge.points,
-        schemaJson: null,
-        starterCodes: [],
-        hints: [],
-        locked: true,
+        id: challenge.id, slug: challenge.slug, titleEn: challenge.titleEn, titleAr: challenge.titleAr,
+        descriptionEn: '', descriptionAr: '', difficulty: challenge.difficulty, points: challenge.points,
+        schemaJson: null, starterCodes: [], hints: [], locked: true, isBoss: false,
       });
     }
 
@@ -92,10 +81,8 @@ export async function getChallenge(req: AuthRequest, res: Response, next: NextFu
     });
     const revealedIds = new Set(usages.map((u) => u.hintId));
 
-    // SECURITY: the answer and the DML verification query must never reach the browser.
-    // (The intersection type keeps this compiling even before the verificationQuery migration.)
-    const { referenceAnswer, verificationQuery, hints, starterCodes, ...safeChallenge } =
-      challenge as typeof challenge & { verificationQuery?: string | null };
+    // SECURITY: the answer and the hidden fixture SQL must never reach the browser.
+    const { referenceAnswer, verificationQuery, setupSql, hints, starterCodes, ...safeChallenge } = challenge;
 
     res.json({
       ...safeChallenge,
@@ -106,6 +93,7 @@ export async function getChallenge(req: AuthRequest, res: Response, next: NextFu
           : { id: h.id, order: h.order, pointPenalty: h.pointPenalty, revealed: false }
       ),
       locked: false,
+      isBoss: access.isBoss,
     });
   } catch (err) { next(err); }
 }
@@ -113,9 +101,8 @@ export async function getChallenge(req: AuthRequest, res: Response, next: NextFu
 export async function revealHint(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const hint = await prisma.hint.findUniqueOrThrow({ where: { id: req.params.hintId as string } });
-
-    const locked = await isChallengeLocked(hint.challengeId, req.userId);
-    if (locked) return res.status(403).json({ error: 'This challenge is locked.' });
+    const access = await getChallengeAccess(hint.challengeId, req.userId);
+    if (access.hidden || access.locked) return res.status(403).json({ error: 'This challenge is locked.' });
 
     await prisma.hintUsage.upsert({
       where: { userId_hintId: { userId: req.userId!, hintId: hint.id } },
@@ -123,31 +110,25 @@ export async function revealHint(req: AuthRequest, res: Response, next: NextFunc
       create: { userId: req.userId!, hintId: hint.id },
     });
 
-    res.json({
-      id: hint.id,
-      order: hint.order,
-      pointPenalty: hint.pointPenalty,
-      contentEn: hint.contentEn,
-      contentAr: hint.contentAr,
-    });
+    res.json({ id: hint.id, order: hint.order, pointPenalty: hint.pointPenalty, contentEn: hint.contentEn, contentAr: hint.contentAr });
   } catch (err) { next(err); }
 }
 
 export async function getChallengeSampleData(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const challenge = await prisma.challenge.findUniqueOrThrow({ where: { slug: req.params.slug as string } });
-
-    const locked = await isChallengeLocked(challenge.id, req.userId);
-    if (locked) return res.status(403).json({ error: 'This challenge is locked.' });
+    const access = await getChallengeAccess(challenge.id, req.userId);
+    if (access.hidden || access.locked) return res.status(403).json({ error: 'This challenge is locked.' });
     if (!challenge.schemaJson) return res.json({ tables: [] });
 
     let schema: { tables: { name: string; columns: { name: string }[] }[] };
     try { schema = JSON.parse(challenge.schemaJson); } catch { return res.json({ tables: [] }); }
 
     const results = [];
-    for (const table of schema.tables ?? []) {
-      if (!SAFE_IDENTIFIER.test(table.name)) continue; // table names come from admin-authored JSON
-      const result = await testSqlQuery(`SELECT * FROM ${table.name} LIMIT 5`);
+    for (const table of schema.tables || []) {
+      if (!SAFE_IDENTIFIER.test(table.name)) continue;
+      // The hidden fixture runs first, so tables a challenge creates for you (dept80, emp, ...) show up here too.
+      const result = await testSqlQuery(`SELECT * FROM ${table.name} LIMIT 5`, challenge.setupSql);
       results.push({
         name: table.name,
         columns: result.ok ? result.columns : table.columns.map((c) => c.name),

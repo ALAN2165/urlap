@@ -1,16 +1,20 @@
 'use client';
 
-import { Fragment } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { Lock } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { ArrowRight, CheckCircle2, Crown, Flame, Lock } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { PathChallenge } from '@/types';
+import { useExtra } from '@/i18n/extra';
+import { AuraFrame, EmberField } from './BossAura';
 
 const CARD_W = 260;
 const H_WIRE_W = 64;
 const V_WIRE_W = 32;
 const V_OFFSET = CARD_W / 2 - V_WIRE_W / 2;
+const SNAKE_W = CARD_W * 3 + H_WIRE_W * 2;
+const BOSS_COLOR = '#f43f5e';
 
 type WireState = 'done' | 'active' | 'future';
 
@@ -26,9 +30,9 @@ const WIRE_COLOR: Record<WireState, string> = {
   future: '#64748b',
 };
 
-function Wire({ state, direction }: { state: WireState; direction: 'right' | 'left' | 'down' }) {
+function Wire({ state, direction, color: colorOverride }: { state: WireState; direction: 'right' | 'left' | 'down'; color?: string }) {
   const vertical = direction === 'down';
-  const color = WIRE_COLOR[state];
+  const color = colorOverride ?? WIRE_COLOR[state];
   const width = vertical ? V_WIRE_W : H_WIRE_W;
   const height = vertical ? H_WIRE_W : V_WIRE_W;
 
@@ -198,12 +202,13 @@ function ChallengeNode({ labSlug, challenge, index }: { labSlug: string; challen
   );
 }
 
-export default function SnakePath({ labSlug, challenges }: { labSlug: string; challenges: PathChallenge[] }) {
+/** The S-shaped path itself (rows of 3, snaking back and forth). `offset` keeps the numbering continuous. */
+function Snake({ labSlug, challenges, offset }: { labSlug: string; challenges: PathChallenge[]; offset: number }) {
   const rows: PathChallenge[][] = [];
   for (let i = 0; i < challenges.length; i += 3) rows.push(challenges.slice(i, i + 3));
 
   return (
-    <div dir="ltr" className="mx-auto flex w-fit flex-col">
+    <div className="flex flex-col">
       {rows.map((row, rowIdx) => {
         const reversed = rowIdx % 2 === 1;
         const display = reversed ? [...row].reverse() : row;
@@ -217,7 +222,7 @@ export default function SnakePath({ labSlug, challenges }: { labSlug: string; ch
                 const following = display[i + 1];
                 return (
                   <Fragment key={c.id}>
-                    <ChallengeNode labSlug={labSlug} challenge={c} index={gi} />
+                    <ChallengeNode labSlug={labSlug} challenge={c} index={gi + offset} />
                     {following && (
                       <Wire
                         state={wireState(challenges[Math.max(gi, challenges.indexOf(following))])}
@@ -240,6 +245,151 @@ export default function SnakePath({ labSlug, challenges }: { labSlug: string; ch
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** Horizontal centre of the last node of a snake with `count` challenges (so the boss wire can drop straight from it). */
+function lastNodeCenterX(count: number): number {
+  const rowIdx = Math.floor((count - 1) / 3);
+  const reversed = rowIdx % 2 === 1;
+  const inLastRow = count - rowIdx * 3;
+  const slot = reversed ? 3 - inLastRow : inLastRow - 1;
+  return slot * (CARD_W + H_WIRE_W) + CARD_W / 2;
+}
+
+/** The hidden Master Challenge: a crimson wire from the last node into a prestige banner. */
+function BossGate({ labSlug, boss, connectorX }: { labSlug: string; boss: PathChallenge; connectorX: number }) {
+  const t = useTranslations('challenge');
+  const x = useExtra();
+  const locale = useLocale();
+  const reduce = useReducedMotion();
+  const [reveal, setReveal] = useState(false);
+
+  // The dramatic "it appears" intro plays once per student per boss.
+  useEffect(() => {
+    const key = `urlap:boss-seen:${boss.id}`;
+    let seen = true;
+    try { seen = localStorage.getItem(key) === '1'; } catch { /* storage unavailable */ }
+    if (seen) return;
+    setReveal(true);
+    const id = setTimeout(() => {
+      setReveal(false);
+      try { localStorage.setItem(key, '1'); } catch { /* ignore */ }
+    }, reduce ? 800 : 3400);
+    return () => clearTimeout(id);
+  }, [boss.id, reduce]);
+
+  const difficultyLabel =
+    boss.difficulty === 'EASY' ? t('difficultyEasy')
+    : boss.difficulty === 'MEDIUM' ? t('difficultyMedium')
+    : boss.difficulty === 'HARD' ? t('difficultyHard')
+    : t('difficultyExpert');
+  const title = locale === 'ar' ? boss.titleAr : boss.titleEn;
+
+  return (
+    <div>
+      <div className="flex py-1" style={{ paddingLeft: connectorX - V_WIRE_W / 2 }}>
+        <Wire state={boss.solved ? 'done' : 'active'} direction="down" color={BOSS_COLOR} />
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 40, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.8, ease: 'easeOut' }}
+        whileHover={{ y: -4 }}
+        style={{ width: SNAKE_W }}
+      >
+        <Link href={`/challenges/${labSlug}/${boss.slug}`} className="block">
+          <AuraFrame>
+            <div dir={locale === 'ar' ? 'rtl' : 'ltr'} className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-[#1a0a14] to-slate-950 px-8 py-9">
+              <EmberField />
+              <motion.div
+                aria-hidden
+                className="pointer-events-none absolute left-1/2 top-0 h-56 w-[120%] -translate-x-1/2 rounded-full bg-rose-600/25 blur-3xl"
+                animate={reduce ? undefined : { opacity: [0.5, 1, 0.5], scale: [1, 1.1, 1] }}
+                transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+              />
+
+              <div className="relative z-10 flex items-center gap-8">
+                <motion.div
+                  animate={reduce ? undefined : { y: [0, -6, 0] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                  className="flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 via-rose-500 to-purple-600 shadow-[0_0_50px_rgba(244,63,94,0.7)]"
+                >
+                  <Crown size={36} className="text-white" />
+                </motion.div>
+
+                <div className="min-w-0 flex-1 text-start">
+                  <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.25em] text-amber-300">
+                    <Flame size={12} /> {x('bossLabel')}
+                  </span>
+                  <h3 className="bg-gradient-to-r from-amber-300 via-rose-400 to-purple-400 bg-clip-text text-2xl font-black leading-tight text-transparent sm:text-3xl">{title}</h3>
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-sm font-bold">
+                    <span className="rounded-full bg-rose-500/15 px-3 py-0.5 text-rose-300">{difficultyLabel}</span>
+                    <span className="text-amber-300">{boss.points} {t('pts')}</span>
+                    {boss.solved && <span className="flex items-center gap-1 text-emerald-300"><CheckCircle2 size={15} /> {x('bossConquered')}</span>}
+                  </div>
+                </div>
+
+                <span className="group hidden flex-shrink-0 items-center gap-2 rounded-full bg-gradient-to-r from-rose-600 via-red-600 to-amber-500 px-7 py-3 text-sm font-extrabold text-white shadow-[0_0_35px_rgba(244,63,94,0.6)] sm:inline-flex">
+                  {x('bossCta')}
+                  <ArrowRight size={16} className="rtl:rotate-180" />
+                </span>
+              </div>
+
+              <AnimatePresence>
+                {reveal && (
+                  <motion.div
+                    key="reveal"
+                    initial={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.9 }}
+                    className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black px-6 text-center"
+                  >
+                    <motion.span
+                      aria-hidden
+                      className="absolute h-40 w-40 rounded-full border-2 border-rose-500"
+                      initial={{ scale: 0.2, opacity: 1 }}
+                      animate={{ scale: 7, opacity: 0 }}
+                      transition={{ duration: 2.2, ease: 'easeOut', repeat: Infinity }}
+                    />
+                    <motion.div initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 120, damping: 12 }}>
+                      <Crown size={48} className="mx-auto mb-3 text-amber-300" />
+                    </motion.div>
+                    <motion.h3 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="relative text-2xl font-black text-white sm:text-3xl">
+                      {x('bossRevealTitle')}
+                    </motion.h3>
+                    <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }} className="relative mt-2 max-w-md text-sm text-rose-200">
+                      {x('bossRevealBody')}
+                    </motion.p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </AuraFrame>
+        </Link>
+      </motion.div>
+    </div>
+  );
+}
+
+export default function SnakePath({ labSlug, challenges }: { labSlug: string; challenges: PathChallenge[] }) {
+  // The hidden Master Challenge arrives in the list only once the student has earned it.
+  const boss = challenges.find((c) => c.isBoss) ?? null;
+  const normal = challenges.filter((c) => !c.isBoss);
+  const before = boss ? normal.filter((c) => c.orderIndex < boss.orderIndex) : normal;
+  const after = boss ? normal.filter((c) => c.orderIndex > boss.orderIndex) : [];
+
+  return (
+    <div dir="ltr" className="mx-auto flex w-fit flex-col">
+      <Snake labSlug={labSlug} challenges={before} offset={0} />
+      {boss && <BossGate labSlug={labSlug} boss={boss} connectorX={lastNodeCenterX(before.length)} />}
+      {after.length > 0 && (
+        <div className="mt-10">
+          <Snake labSlug={labSlug} challenges={after} offset={before.length + 1} />
+        </div>
+      )}
     </div>
   );
 }

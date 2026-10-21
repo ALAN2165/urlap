@@ -1,17 +1,14 @@
 import { Worker, Job } from 'bullmq';
 import { redisConnection } from '../config/redis';
 import { runInSandbox } from '../services/sandbox/dockerRunner';
-import { runSqlGraded } from '../services/sqlGrader.service';
+import { gradeSqlSubmission } from '../services/sqlGrader.service';
 import { prisma } from '../config/db';
 import { ExecutionJobData } from './executionQueue';
 import { checkForStruggleAlert } from '../services/alertDetection.service';
 
 async function recordCompletion(userId: string, challengeId: string, points: number): Promise<number> {
   return prisma.$transaction(async (tx) => {
-    const { count } = await tx.challengeCompletion.createMany({
-      data: [{ userId, challengeId, pointsEarned: points }],
-      skipDuplicates: true,
-    });
+    const { count } = await tx.challengeCompletion.createMany({ data: [{ userId, challengeId, pointsEarned: points }], skipDuplicates: true });
     if (count === 0) return 0;
     await tx.user.update({ where: { id: userId }, data: { totalPoints: { increment: points } } });
     return points;
@@ -22,19 +19,10 @@ const worker = new Worker<ExecutionJobData>(
   'code-execution',
   async (job: Job<ExecutionJobData>) => {
     const { submissionId, challengeId, userId, language, code } = job.data;
-
-    // Canary: if this line never appears in your logs after submitting,
-    // the worker isn't receiving jobs at all — check that the backend
-    // process actually imports './queues/executionWorker' (see index.ts)
-    // and that Redis is reachable (check /admin → System Health).
     console.log(`[worker] Job received — job ${job.id}, submission ${submissionId}`);
 
     try {
-      const challenge = await prisma.challenge.findUniqueOrThrow({
-        where: { id: challengeId },
-        include: { testCases: true },
-      });
-
+      const challenge = await prisma.challenge.findUniqueOrThrow({ where: { id: challengeId }, include: { testCases: true } });
       await prisma.submission.update({ where: { id: submissionId }, data: { status: 'RUNNING' } });
 
       let status: string;
@@ -45,15 +33,15 @@ const worker = new Worker<ExecutionJobData>(
       let resultJson: string | null = null;
 
       if (language === 'SQL' && challenge.referenceAnswer) {
-        const result = await runSqlGraded(challenge.referenceAnswer, code);
+        const result = await gradeSqlSubmission(challenge, code);
         status = result.status;
         allPassed = result.passed;
         output = result.output;
         errorMsg = result.errorMessage;
         runtimeMs = result.runtimeMs;
         resultJson = JSON.stringify({
-          columns: result.resultColumns, rows: result.resultRows,
-          totalRows: result.totalRows, expectedRowCount: result.expectedRowCount, failureReason: result.failureReason,
+          columns: result.resultColumns, rows: result.resultRows, totalRows: result.totalRows,
+          expectedRowCount: result.expectedRowCount, failureReason: result.failureReason, panels: result.panels,
         });
       } else {
         allPassed = true;
@@ -75,16 +63,11 @@ const worker = new Worker<ExecutionJobData>(
         where: { id: submissionId },
         data: { status: status as any, actualOutput: output, errorMessage: errorMsg || null, resultJson, runtimeMs, pointsAwarded },
       });
-
       console.log(`[worker] Submission ${submissionId} graded as ${status} — now checking struggle alert.`);
 
       try {
         await checkForStruggleAlert(userId, challengeId, status);
       } catch (alertErr) {
-        // This is almost certainly where a schema/migration problem would
-        // surface. Check this log line's message, or check /admin → System
-        // Health → "Realtime/Chat schema" for the same diagnosis without
-        // needing to read logs at all.
         console.error(`[worker] Struggle-alert check FAILED for submission ${submissionId}:`, alertErr);
       }
     } catch (err: any) {

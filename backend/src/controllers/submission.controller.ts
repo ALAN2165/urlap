@@ -3,45 +3,40 @@ import { AuthRequest } from '../middleware/authMiddleware';
 import { submissionSchema } from '../validators/submission.validator';
 import { prisma } from '../config/db';
 import { enqueueExecution } from '../queues/executionQueue';
-import { isChallengeLocked } from '../services/challenge.service';
+import { isChallengeLocked } from '../services/labProgress.service';
 
 export async function createSubmission(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { challengeId, language, code } = submissionSchema.parse(req.body);
+    const { challengeId, language, code, isPasted, timeSpentSeconds, tabSwitches } = submissionSchema.parse(req.body);
 
     const locked = await isChallengeLocked(challengeId, req.userId);
-    if (locked) {
-      return res.status(403).json({ error: 'This challenge is locked. Solve the previous challenge first.' });
-    }
+    if (locked) return res.status(403).json({ error: 'This challenge is locked. Solve the previous challenge first.' });
 
     const submission = await prisma.submission.create({
-      data: { userId: req.userId!, challengeId, language, code, status: 'PENDING' },
+      data: {
+        userId: req.userId!, challengeId, language, code, status: 'PENDING',
+        isPasted: isPasted ?? false, timeSpentSeconds: timeSpentSeconds ?? null, tabSwitches: tabSwitches ?? 0,
+      },
     });
 
     await enqueueExecution({ submissionId: submission.id, challengeId, userId: req.userId!, language, code });
-
     res.status(202).json({ submissionId: submission.id, status: 'PENDING' });
   } catch (err) { next(err); }
 }
 
 interface StoredResult {
-  columns?: string[];
-  rows?: unknown[][];
-  totalRows?: number;
-  expectedRowCount?: number | null;
-  failureReason?: string | null;
+  columns?: string[]; rows?: unknown[][]; totalRows?: number; expectedRowCount?: number | null;
+  failureReason?: string | null; panels?: unknown[];
 }
 
 export async function getSubmission(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const submission = await prisma.submission.findUniqueOrThrow({ where: { id : req.params.id as string} });
+    const submission = await prisma.submission.findUniqueOrThrow({ where: { id: req.params.id as string } });
     if (submission.userId !== req.userId) return res.status(403).json({ error: 'Forbidden' });
 
-    const { resultJson , code, ...rest  } = submission ;
+    const { resultJson, code, ...rest } = submission;
     let parsed: StoredResult = {};
-    if (resultJson) {
-      try { parsed = JSON.parse(resultJson); } catch { parsed = {}; }
-    }
+    if (resultJson) { try { parsed = JSON.parse(resultJson); } catch { parsed = {}; } }
 
     res.json({
       ...rest,
@@ -50,6 +45,8 @@ export async function getSubmission(req: AuthRequest, res: Response, next: NextF
       totalRows: parsed.totalRows ?? 0,
       expectedRowCount: parsed.expectedRowCount ?? null,
       failureReason: parsed.failureReason ?? null,
+      // Expected-vs-actual tables are only sent for wrong answers (never the reference SQL itself).
+      comparison: submission.status === 'WRONG_ANSWER' ? parsed.panels ?? [] : [],
     });
   } catch (err) { next(err); }
 }

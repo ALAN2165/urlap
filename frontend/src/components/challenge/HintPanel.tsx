@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lightbulb, Lock } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
@@ -14,6 +14,19 @@ export default function HintPanel({ hints }: { hints: HintMeta[] }) {
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   const sorted = [...hints].sort((a, b) => a.order - b.order);
+
+  // Hints this student already opened (the server sends their text) stay open after a refresh or a revisit.
+  useEffect(() => {
+    setRevealed((prev) => {
+      const next = { ...prev };
+      for (const h of hints) {
+        if (h.revealed && h.contentEn !== undefined && h.contentAr !== undefined) {
+          next[h.id] = { id: h.id, order: h.order, pointPenalty: h.pointPenalty, contentEn: h.contentEn, contentAr: h.contentAr };
+        }
+      }
+      return next;
+    });
+  }, [hints]);
 
   async function reveal(hintId: string) {
     setLoadingId(hintId);

@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { register, login, me, stats, updateProfile } from '../controllers/auth.controller';
+import { register, login, me, updateProfile } from '../controllers/auth.controller';
+import { stats } from '../controllers/stats.controller';
 import { uploadAvatarHandler } from '../controllers/avatar.controller';
 import { uploadAvatar } from '../middleware/uploadAvatar';
 import { requireAuth } from '../middleware/authMiddleware';
