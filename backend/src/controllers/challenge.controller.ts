@@ -21,7 +21,7 @@ export async function getLabs(req: AuthRequest, res: Response, next: NextFunctio
 
     res.json(labs.map((lab) => {
       const access = computeAccess(lab.challenges, solved);
-      const visible = lab.challenges.filter((c) => !(access.get(c.id)!).hidden); // a hidden Master Challenge isn't counted
+      const visible = lab.challenges.filter((c) => !(access.get(c.id)!).hidden);
       return {
         id: lab.id, slug: lab.slug, titleEn: lab.titleEn, titleAr: lab.titleAr, orderIndex: lab.orderIndex,
         totalChallenges: visible.length,
@@ -45,7 +45,6 @@ export async function getLab(req: AuthRequest, res: Response, next: NextFunction
     const solved = await solvedSet(req.userId!);
     const access = computeAccess(lab.challenges, solved);
 
-    // A Master Challenge that hasn't been earned yet is simply absent. Once earned it is in the list, flagged isBoss.
     const challenges = lab.challenges
       .filter((c) => !(access.get(c.id)!).hidden)
       .map(({ isMaster, ...c }) => ({ ...c, solved: solved.has(c.id), locked: access.get(c.id)!.locked, isBoss: access.get(c.id)!.isBoss }));
@@ -62,7 +61,7 @@ export async function getChallenge(req: AuthRequest, res: Response, next: NextFu
     });
 
     const access = await getChallengeAccess(challenge.id, req.userId);
-    if (access.hidden) return res.status(404).json({ error: 'Challenge not found.' }); // Master Challenge not earned yet
+    if (access.hidden) return res.status(404).json({ error: 'Challenge not found.' });
 
     if (access.locked) {
       return res.json({
@@ -78,13 +77,14 @@ export async function getChallenge(req: AuthRequest, res: Response, next: NextFu
     });
     const revealedIds = new Set(usages.map((u) => u.hintId));
 
-    // SECURITY: the answer and the hidden fixture SQL must never reach the browser.
-    const { referenceAnswer, verificationQuery, setupSql, isMaster, hints, starterCodes, ...safeChallenge } = challenge;
+    // SECURITY: safe extraction without throwing type errors
+    const rawChallenge = challenge as any;
+    const { referenceAnswer, verificationQuery, setupSql, isMaster, hints, starterCodes, ...safeChallenge } = rawChallenge;
 
     res.json({
       ...safeChallenge,
       starterCodes,
-      hints: hints.map((h) =>
+      hints: hints.map((h: any) =>
         revealedIds.has(h.id)
           ? { id: h.id, order: h.order, pointPenalty: h.pointPenalty, revealed: true, contentEn: h.contentEn, contentAr: h.contentAr }
           : { id: h.id, order: h.order, pointPenalty: h.pointPenalty, revealed: false }

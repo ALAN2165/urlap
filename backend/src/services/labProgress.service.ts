@@ -6,28 +6,36 @@ interface OrderedChallenge { id: string; isMaster: boolean }
 /**
  * `ordered` = a lab's challenges sorted by orderIndex.
  *  - Regular challenges unlock one after another (masters don't take part in that chain).
- *  - A Master Challenge is HIDDEN until every regular challenge before it is solved.
+ *  - A Master Challenge is HIDDEN until every regular challenge before it is solved (unless user is ADMIN).
  */
-export function computeAccess(ordered: OrderedChallenge[], solved: Set<string>): Map<string, ChallengeAccess> {
+export function computeAccess(ordered: OrderedChallenge[], solved: Set<string>, isAdmin: boolean = false): Map<string, ChallengeAccess> {
   const regular = ordered.filter((c) => !c.isMaster);
   const map = new Map<string, ChallengeAccess>();
 
   ordered.forEach((c, i) => {
     if (c.isMaster) {
-      const hidden = !ordered.slice(0, i).filter((p) => !p.isMaster).every((p) => solved.has(p.id));
+      // لو أدمن، بنخليه يظهر فوراً ومش مخفي عشان تقدر تختبره براحتك
+      const hidden = isAdmin ? false : !ordered.slice(0, i).filter((p) => !p.isMaster).every((p) => solved.has(p.id));
       map.set(c.id, { hidden, locked: false, isBoss: true });
       return;
     }
     const pos = regular.findIndex((r) => r.id === c.id);
-    map.set(c.id, { hidden: false, locked: pos > 0 && !solved.has(regular[pos - 1].id), isBoss: false });
+    map.set(c.id, { hidden: false, locked: !isAdmin && pos > 0 && !solved.has(regular[pos - 1].id), isBoss: false });
   });
   return map;
+}
+
+async function checkIsAdmin(userId?: string): Promise<boolean> {
+  if (!userId) return false;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  return user?.role === 'ADMIN';
 }
 
 export async function getChallengeAccess(challengeId: string, userId?: string): Promise<ChallengeAccess> {
   const ch = await prisma.challenge.findUniqueOrThrow({ where: { id: challengeId }, select: { labId: true } });
   if (!ch.labId) return { hidden: false, locked: false, isBoss: false };
 
+  const isAdmin = await checkIsAdmin(userId);
   const ordered = await prisma.challenge.findMany({
     where: { labId: ch.labId },
     orderBy: { orderIndex: 'asc' },
@@ -36,7 +44,7 @@ export async function getChallengeAccess(challengeId: string, userId?: string): 
   const done = userId
     ? await prisma.challengeCompletion.findMany({ where: { userId, challengeId: { in: ordered.map((o) => o.id) } }, select: { challengeId: true } })
     : [];
-  return computeAccess(ordered, new Set(done.map((d) => d.challengeId))).get(challengeId) as ChallengeAccess;
+  return computeAccess(ordered, new Set(done.map((d) => d.challengeId)), isAdmin).get(challengeId) as ChallengeAccess;
 }
 
 /** True when the challenge is locked OR still hidden (a hidden Master Challenge can't be submitted to). */
@@ -47,6 +55,7 @@ export async function isChallengeLocked(challengeId: string, userId?: string): P
 
 /** Number of challenges a student can currently see (hidden Master Challenges aren't counted). */
 export async function countVisibleChallenges(userId: string): Promise<number> {
+  const isAdmin = await checkIsAdmin(userId);
   const [all, done] = await Promise.all([
     prisma.challenge.findMany({ orderBy: [{ labId: 'asc' }, { orderIndex: 'asc' }], select: { id: true, labId: true, isMaster: true } }),
     prisma.challengeCompletion.findMany({ where: { userId }, select: { challengeId: true } }),
@@ -62,7 +71,7 @@ export async function countVisibleChallenges(userId: string): Promise<number> {
     byLab.set(c.labId, list);
   }
   byLab.forEach((list) => {
-    const access = computeAccess(list, solved);
+    const access = computeAccess(list, solved, isAdmin);
     list.forEach((c) => { if (!(access.get(c.id) as ChallengeAccess).hidden) visible++; });
   });
   return visible;
