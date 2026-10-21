@@ -4,7 +4,7 @@ import { requireAdmin } from '../middleware/adminMiddleware';
 import { getOverview, getHealth } from '../controllers/admin.controller';
 import { adminGetAnalytics } from '../controllers/adminAnalytics.controller';
 import { adminGetLabs, adminCreateLab, adminUpdateLab, adminGetChallenge, adminCreateChallenge, adminUpdateChallenge, adminDeleteChallenge, adminReorderChallenges } from '../controllers/adminChallenges.controller';
-import { adminReorderLabs } from '../controllers/adminLabs.controller';
+import { adminReorderLabs, adminDeleteLab } from '../controllers/adminLabs.controller';
 import { adminTestSql } from '../controllers/adminSql.controller';
 import { adminGetUsers, adminSetUserRole, adminSetUserBan, adminGetUserSubmissions } from '../controllers/adminUsers.controller';
 import { adminGetAnnouncements, adminCreateAnnouncement, adminUpdateAnnouncement, adminDeleteAnnouncement } from '../controllers/adminAnnouncements.controller';
@@ -23,6 +23,7 @@ router.get('/labs', adminGetLabs);
 router.post('/labs', adminCreateLab);
 router.put('/labs/reorder', adminReorderLabs); // must stay BEFORE '/labs/:id'
 router.put('/labs/:id', adminUpdateLab);
+router.delete('/labs/:id', adminDeleteLab);
 router.put('/labs/:labId/reorder', adminReorderChallenges);
 
 router.get('/challenges/:id', adminGetChallenge);

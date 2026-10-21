@@ -7,7 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowLeft, Lock, Loader2, Zap, Flag, Crown, Flame, RotateCcw, Check } from 'lucide-react';
+import { ArrowLeft, Lock, Loader2, Zap, Flag, Crown, Sparkles, RotateCcw, Check } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { ChallengeDetail, LabDetail, Submission } from '@/types';
@@ -194,8 +194,8 @@ export default function ChallengeSolvePage() {
     );
   }
 
-  const isBoss = !!challenge.isBoss;
-  const ordered = lab ? [...lab.challenges, ...(lab.boss ? [lab.boss] : [])].sort((a, b) => a.orderIndex - b.orderIndex) : [];
+  const isMaster = !!challenge.isBoss;
+  const ordered = lab ? [...lab.challenges].sort((a, b) => a.orderIndex - b.orderIndex) : [];
   const idx = ordered.findIndex((c) => c.slug === challengeSlug);
   const next = idx >= 0 ? ordered[idx + 1] : undefined;
   const nextHref = submission?.status === 'ACCEPTED' && next && !next.locked ? `/challenges/${labSlug}/${next.slug}` : undefined;
@@ -208,11 +208,13 @@ export default function ChallengeSolvePage() {
     : challenge.difficulty === 'HARD' ? t('difficultyHard')
     : t('difficultyExpert');
 
-  const conquered = isBoss && submission?.status === 'ACCEPTED' && submission.pointsAwarded > 0;
+  const conquered = isMaster && submission?.status === 'ACCEPTED' && submission.pointsAwarded > 0;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 md:py-10">
-      {isBoss && <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,rgba(244,63,94,0.2),transparent_60%),radial-gradient(ellipse_at_bottom,rgba(124,58,237,0.15),transparent_55%)]" />}
+      {isMaster && (
+        <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,rgba(217,154,168,0.12),transparent_60%),radial-gradient(ellipse_at_bottom,rgba(165,151,220,0.10),transparent_55%)]" />
+      )}
 
       <Link href={`/challenges/${labSlug}`} className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-purple-600 dark:text-slate-400 dark:hover:text-purple-400 md:mb-6">
         <ArrowLeft size={16} className="rtl:rotate-180" />
@@ -221,18 +223,18 @@ export default function ChallengeSolvePage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-          {isBoss ? (
+          {isMaster ? (
             <AuraFrame className="mb-6">
-              <div className="relative bg-gradient-to-br from-slate-950 via-[#1a0a14] to-slate-950 p-5 sm:p-7">
-                <EmberField count={14} />
+              <div className="relative bg-gradient-to-br from-slate-900 via-[#1d1722] to-slate-900 p-5 sm:p-7">
+                <EmberField count={8} />
                 <div className="relative z-10">
-                  <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.2em] text-amber-300">
+                  <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-amber-200/30 bg-amber-200/10 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.2em] text-amber-200">
                     <Crown size={12} /> {x('bossLabel')}
                   </span>
-                  <h1 className="mb-3 bg-gradient-to-r from-amber-300 via-rose-400 to-purple-400 bg-clip-text text-2xl font-black text-transparent sm:text-3xl">{title}</h1>
+                  <h1 className="mb-3 bg-gradient-to-r from-amber-100 via-rose-200 to-violet-200 bg-clip-text text-2xl font-black text-transparent sm:text-3xl">{title}</h1>
                   <div className="mb-5 flex items-center gap-3">
-                    <span className="flex items-center gap-1 rounded-full bg-rose-500/15 px-3 py-1 text-xs font-bold text-rose-300"><Flame size={12} />{difficultyLabel}</span>
-                    <span className="text-sm font-bold text-amber-300">{challenge.points} {t('pts')}</span>
+                    <span className="flex items-center gap-1 rounded-full bg-rose-300/10 px-3 py-1 text-xs font-bold text-rose-200"><Sparkles size={12} />{difficultyLabel}</span>
+                    <span className="text-sm font-bold text-amber-200">{challenge.points} {t('pts')}</span>
                   </div>
                   <p className="whitespace-pre-line leading-relaxed text-slate-200">{description}</p>
                 </div>
@@ -271,14 +273,14 @@ export default function ChallengeSolvePage() {
             <button
               onClick={handleSubmit}
               disabled={running}
-              className={`flex items-center gap-2 rounded-full px-6 py-2.5 font-semibold text-white transition-all duration-300 hover:-translate-y-1 disabled:opacity-60 disabled:hover:translate-y-0 ${isBoss ? 'bg-gradient-to-r from-rose-600 via-red-600 to-amber-500 shadow-[0_0_24px_rgba(244,63,94,0.5)]' : 'bg-gradient-to-r from-purple-600 to-purple-800 shadow-[0_0_18px_rgba(147,51,234,0.3)]'}`}
+              className={`flex items-center gap-2 rounded-full px-6 py-2.5 font-semibold text-white transition-all duration-300 hover:-translate-y-1 disabled:opacity-60 disabled:hover:translate-y-0 ${isMaster ? 'bg-gradient-to-r from-rose-500 to-amber-500 shadow-[0_0_20px_rgba(244,114,182,0.28)]' : 'bg-gradient-to-r from-purple-600 to-purple-800 shadow-[0_0_18px_rgba(147,51,234,0.3)]'}`}
             >
               {running ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
               {running ? t('checking') : t('submitQuery')}
             </button>
           </div>
 
-          <div className={isBoss ? 'rounded-2xl shadow-[0_0_45px_-8px_rgba(244,63,94,0.45)] ring-1 ring-rose-500/30' : ''}>
+          <div className={isMaster ? 'rounded-2xl shadow-[0_0_40px_-10px_rgba(217,154,168,0.35)] ring-1 ring-rose-300/25' : ''}>
             <CodeEditor value={code} onChange={setCode} language="SQL" onPaste={handlePaste} />
           </div>
           {hasDraft && (
@@ -286,10 +288,10 @@ export default function ChallengeSolvePage() {
           )}
 
           {conquered && (
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 14 }}
-              className="relative mt-4 overflow-hidden rounded-2xl border border-amber-400/40 bg-gradient-to-r from-amber-500/15 via-rose-500/15 to-purple-500/15 p-5 text-center">
-              <Crown size={28} className="mx-auto mb-2 text-amber-400" />
-              <div className="bg-gradient-to-r from-amber-300 via-rose-400 to-purple-400 bg-clip-text text-lg font-black text-transparent">{x('bossVictory')}</div>
+            <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 16 }}
+              className="relative mt-4 overflow-hidden rounded-2xl border border-amber-200/30 bg-gradient-to-r from-amber-200/10 via-rose-200/10 to-violet-200/10 p-5 text-center">
+              <Crown size={26} className="mx-auto mb-2 text-amber-300" />
+              <div className="bg-gradient-to-r from-amber-200 via-rose-300 to-violet-300 bg-clip-text text-lg font-black text-transparent">{x('bossVictory')}</div>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{x('bossVictoryBody')}</p>
             </motion.div>
           )}

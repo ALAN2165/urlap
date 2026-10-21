@@ -4,12 +4,13 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { X, Save, Trash2, Loader2 } from 'lucide-react';
+import { X, Save, Trash2, Loader2, Crown } from 'lucide-react';
 import { api } from '@/lib/api';
 import { AdminChallengeDetail, AdminHint } from '@/types/admin';
 import SchemaBuilder from './SchemaBuilder';
 import HintsEditor from './HintsEditor';
 import SqlTester from './SqlTester';
+import Switch from '@/components/shared/Switch';
 
 interface Props { labId: string; challengeId: string | null; onClose: () => void; }
 
@@ -40,6 +41,7 @@ export default function ChallengeEditorPanel({ labId, challengeId, onClose }: Pr
   const [descriptionAr, setDescriptionAr] = useState('');
   const [difficulty, setDifficulty] = useState<(typeof DIFFICULTIES)[number]>('EASY');
   const [points, setPoints] = useState(100);
+  const [isMaster, setIsMaster] = useState(false);
   const [schemaJson, setSchemaJson] = useState<string | null>(null);
   const [referenceAnswer, setReferenceAnswer] = useState('-- write the correct SQL for this challenge\n');
   const [hints, setHints] = useState<AdminHint[]>(EMPTY_HINTS);
@@ -54,6 +56,7 @@ export default function ChallengeEditorPanel({ labId, challengeId, onClose }: Pr
       setDescriptionAr(existing.descriptionAr);
       setDifficulty(existing.difficulty as (typeof DIFFICULTIES)[number]);
       setPoints(existing.points);
+      setIsMaster(!!existing.isMaster);
       setSchemaJson(existing.schemaJson);
       setReferenceAnswer(existing.referenceAnswer ?? '');
       setHints(existing.hints.length === 3 ? existing.hints : EMPTY_HINTS);
@@ -68,13 +71,17 @@ export default function ChallengeEditorPanel({ labId, challengeId, onClose }: Pr
     setSaving(true);
     try {
       const payload = {
-        titleEn, titleAr, descriptionEn, descriptionAr, difficulty, points, schemaJson, referenceAnswer,
+        titleEn, titleAr, descriptionEn, descriptionAr, difficulty, points, isMaster, schemaJson, referenceAnswer,
         hints: hints.map((h) => ({ contentEn: h.contentEn, contentAr: h.contentAr, pointPenalty: h.pointPenalty })),
       };
       if (isEdit) await api.put(`/admin/challenges/${challengeId}`, payload);
       else await api.post('/admin/challenges', { ...payload, labId });
 
-      await queryClient.invalidateQueries({ queryKey: ['admin-labs'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin-labs'] }),
+        queryClient.invalidateQueries({ queryKey: ['lab'] }),
+        queryClient.invalidateQueries({ queryKey: ['labs'] }),
+      ]);
       toast.success(isEdit ? 'Challenge updated.' : 'Challenge created.');
       onClose();
     } catch (err: any) {
@@ -121,6 +128,19 @@ export default function ChallengeEditorPanel({ labId, challengeId, onClose }: Pr
           <div className="flex flex-1 items-center justify-center"><Loader2 size={24} className="animate-spin text-purple-400" /></div>
         ) : (
           <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
+            <div className={`flex items-center justify-between gap-4 rounded-2xl border px-4 py-3 transition-colors ${isMaster ? 'border-amber-300/40 bg-amber-300/10' : 'border-slate-200 bg-slate-50 dark:border-slate-700/50 dark:bg-slate-800/30'}`}>
+              <div className="flex items-start gap-3">
+                <Crown size={18} className={`mt-0.5 flex-shrink-0 ${isMaster ? 'text-amber-400' : 'text-slate-400'}`} />
+                <div>
+                  <div className="text-sm font-bold text-slate-900 dark:text-white">Mystery / Master Challenge</div>
+                  <div className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                    When on, this challenge is completely hidden from students (lab path, counts and direct links) until they solve every regular challenge before it in this lab. It then appears with a special design.
+                  </div>
+                </div>
+              </div>
+              <Switch checked={isMaster} onChange={setIsMaster} />
+            </div>
+
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className={labelClass}>Title (English)</label>
@@ -164,8 +184,8 @@ export default function ChallengeEditorPanel({ labId, challengeId, onClose }: Pr
             <div>
               <SqlTester value={referenceAnswer} onChange={setReferenceAnswer} label="Expected Query (SQL)" />
               <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                Any valid SQL works: SELECT, INSERT, UPDATE or DELETE. A SELECT is graded by the rows it returns, and a data-changing
-                statement is graded by the resulting table data. Nothing is ever saved to the real tables.
+                Any valid SQL works: SELECT, INSERT, UPDATE, DELETE, or Oracle-style DDL. A SELECT is graded by the rows it returns, anything else by the
+                resulting tables and data. Nothing is ever saved to the real tables.
               </p>
             </div>
 

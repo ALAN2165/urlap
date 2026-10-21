@@ -15,7 +15,7 @@ export async function getLabs(req: AuthRequest, res: Response, next: NextFunctio
   try {
     const labs = await prisma.lab.findMany({
       orderBy: { orderIndex: 'asc' },
-      include: { challenges: { orderBy: { orderIndex: 'asc' }, select: { id: true } } },
+      include: { challenges: { orderBy: { orderIndex: 'asc' }, select: { id: true, isMaster: true } } },
     });
     const solved = await solvedSet(req.userId!);
 
@@ -38,22 +38,19 @@ export async function getLab(req: AuthRequest, res: Response, next: NextFunction
       include: {
         challenges: {
           orderBy: { orderIndex: 'asc' },
-          select: { id: true, slug: true, titleEn: true, titleAr: true, difficulty: true, points: true, orderIndex: true },
+          select: { id: true, slug: true, titleEn: true, titleAr: true, difficulty: true, points: true, orderIndex: true, isMaster: true },
         },
       },
     });
     const solved = await solvedSet(req.userId!);
     const access = computeAccess(lab.challenges, solved);
 
-    const visible = lab.challenges
+    // A Master Challenge that hasn't been earned yet is simply absent. Once earned it is in the list, flagged isBoss.
+    const challenges = lab.challenges
       .filter((c) => !(access.get(c.id)!).hidden)
-      .map((c) => ({ ...c, solved: solved.has(c.id), locked: access.get(c.id)!.locked, isBoss: access.get(c.id)!.isBoss }));
+      .map(({ isMaster, ...c }) => ({ ...c, solved: solved.has(c.id), locked: access.get(c.id)!.locked, isBoss: access.get(c.id)!.isBoss }));
 
-    res.json({
-      id: lab.id, slug: lab.slug, titleEn: lab.titleEn, titleAr: lab.titleAr,
-      challenges: visible.filter((c) => !c.isBoss),
-      boss: visible.find((c) => c.isBoss) || null,
-    });
+    res.json({ id: lab.id, slug: lab.slug, titleEn: lab.titleEn, titleAr: lab.titleAr, challenges });
   } catch (err) { next(err); }
 }
 
@@ -82,7 +79,7 @@ export async function getChallenge(req: AuthRequest, res: Response, next: NextFu
     const revealedIds = new Set(usages.map((u) => u.hintId));
 
     // SECURITY: the answer and the hidden fixture SQL must never reach the browser.
-    const { referenceAnswer, verificationQuery, setupSql, hints, starterCodes, ...safeChallenge } = challenge;
+    const { referenceAnswer, verificationQuery, setupSql, isMaster, hints, starterCodes, ...safeChallenge } = challenge;
 
     res.json({
       ...safeChallenge,
@@ -127,7 +124,6 @@ export async function getChallengeSampleData(req: AuthRequest, res: Response, ne
     const results = [];
     for (const table of schema.tables || []) {
       if (!SAFE_IDENTIFIER.test(table.name)) continue;
-      // The hidden fixture runs first, so tables a challenge creates for you (dept80, emp, ...) show up here too.
       const result = await testSqlQuery(`SELECT * FROM ${table.name} LIMIT 5`, challenge.setupSql);
       results.push({
         name: table.name,

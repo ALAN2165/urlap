@@ -136,12 +136,13 @@ model Challenge {
   memoryLimitMb   Int        @default(128)
   orderIndex      Int        @default(0)
 
+  // Mystery / Master Challenge: hidden from students until they solve every regular challenge before it in the lab.
+  isMaster        Boolean    @default(false)
+
   schemaJson        String?  @db.Text
   referenceAnswer   String?  @db.Text
   verificationQuery String?  @db.Text // legacy, no longer read
-  // Hidden fixture SQL run inside the sandbox before BOTH the reference and the student's script
-  // (creates the tables / constraints a challenge needs). Never sent to students.
-  setupSql          String?  @db.Text
+  setupSql          String?  @db.Text // hidden fixture SQL, never sent to students
 
   labId      String?
   lab        Lab?      @relation(fields: [labId], references: [id])

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { Plus, Pencil, ChevronUp, ChevronDown, FolderPlus } from 'lucide-react';
+import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, FolderPlus, Crown } from 'lucide-react';
 import { api } from '@/lib/api';
 import { AdminLab } from '@/types/admin';
 import ChallengeEditorPanel from '@/components/admin/challenges/ChallengeEditorPanel';
@@ -31,10 +31,19 @@ export default function AdminChallengesPage() {
 
   const activeLab = labs?.find((l) => l.id === activeLabId) ?? labs?.[0];
 
+  async function refreshEverywhere() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['admin-labs'] }),
+      queryClient.invalidateQueries({ queryKey: ['labs'] }),
+      queryClient.invalidateQueries({ queryKey: ['lab'] }),
+      queryClient.invalidateQueries({ queryKey: ['stats'] }),
+    ]);
+  }
+
   async function reorder(labId: string, challengeIds: string[]) {
     try {
       await api.put(`/admin/labs/${labId}/reorder`, { challengeIds });
-      queryClient.invalidateQueries({ queryKey: ['admin-labs'] });
+      await refreshEverywhere();
     } catch {
       toast.error('Could not reorder challenges.');
     }
@@ -76,12 +85,30 @@ export default function AdminChallengesPage() {
         setActiveLabId(data.id);
         toast.success('Lab created.');
       }
-      await queryClient.invalidateQueries({ queryKey: ['admin-labs'] });
+      await refreshEverywhere();
       setFormMode('closed');
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Could not save the lab.');
     } finally {
       setSavingLab(false);
+    }
+  }
+
+  async function deleteLab(lab: AdminLab) {
+    const n = lab.challenges.length;
+    const ok = confirm(
+      `Delete the lab "${lab.titleEn}" and its ${n} challenge${n !== 1 ? 's' : ''}?\n\n` +
+      `This also erases every student's submissions and progress in this lab, and it cannot be undone.`
+    );
+    if (!ok) return;
+    try {
+      await api.delete(`/admin/labs/${lab.id}`);
+      setActiveLabId(null);
+      setFormMode('closed');
+      await refreshEverywhere();
+      toast.success('Lab deleted.');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Could not delete the lab.');
     }
   }
 
@@ -139,16 +166,17 @@ export default function AdminChallengesPage() {
       {activeLab && (
         <>
           <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-slate-700 dark:text-slate-300">
+            <div className="flex items-center gap-1">
+              <h2 className="mr-1 text-sm font-bold text-slate-700 dark:text-slate-300">
                 {activeLab.challenges.length} challenge{activeLab.challenges.length !== 1 ? 's' : ''}
               </h2>
-              <button
-                onClick={() => openEditLabForm(activeLab)}
-                className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:bg-purple-500/10 hover:text-purple-500"
-                title="Edit lab name"
-              >
-                <Pencil size={12} />
+              <button onClick={() => openEditLabForm(activeLab)} title="Rename lab"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-purple-500/10 hover:text-purple-500">
+                <Pencil size={13} />
+              </button>
+              <button onClick={() => deleteLab(activeLab)} title="Delete lab"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-red-500/10 hover:text-red-500">
+                <Trash2 size={13} />
               </button>
             </div>
             <button
@@ -162,7 +190,12 @@ export default function AdminChallengesPage() {
 
           <div className="space-y-2">
             {activeLab.challenges.map((c, i) => (
-              <motion.div key={c.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="glass flex items-center gap-3 rounded-xl p-3.5">
+              <motion.div
+                key={c.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`glass flex items-center gap-3 rounded-xl p-3.5 ${c.isMaster ? 'ring-1 ring-amber-300/40' : ''}`}
+              >
                 <div className="flex flex-col">
                   <button onClick={() => moveChallenge(activeLab.id, i, -1)} disabled={i === 0} className="text-slate-400 hover:text-purple-500 disabled:opacity-20">
                     <ChevronUp size={14} />
@@ -173,6 +206,11 @@ export default function AdminChallengesPage() {
                 </div>
                 <span className={`h-2 w-2 flex-shrink-0 rounded-full ${DIFFICULTY_DOT[c.difficulty]}`} />
                 <span className="flex-1 truncate text-sm font-semibold text-slate-900 dark:text-white">{c.titleEn}</span>
+                {c.isMaster && (
+                  <span className="flex flex-shrink-0 items-center gap-1 rounded-full border border-amber-300/40 bg-amber-300/10 px-2 py-0.5 text-[10px] font-bold text-amber-500 dark:text-amber-300">
+                    <Crown size={10} /> Master
+                  </span>
+                )}
                 <span className="flex-shrink-0 text-xs font-bold text-purple-500 dark:text-purple-400">{c.points} pts</span>
                 <button
                   onClick={() => setEditing({ labId: activeLab.id, challengeId: c.id })}

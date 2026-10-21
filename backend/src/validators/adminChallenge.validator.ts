@@ -15,6 +15,7 @@ const challengeBaseSchema = {
   points: z.coerce.number().int().positive(),
   schemaJson: z.string().nullable().optional(),
   referenceAnswer: z.string().min(1),
+  isMaster: z.boolean().optional(),
   hints: z.array(hintInputSchema).length(3),
 };
 

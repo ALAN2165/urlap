@@ -16,3 +16,20 @@ export async function adminReorderLabs(req: AuthRequest, res: Response, next: Ne
     res.json({ ok: true });
   } catch (err) { next(err); }
 }
+
+/** Deletes a lab together with all of its challenges (and, through cascades, their hints, submissions,
+ *  completions, reports and alerts). The remaining labs are renumbered so the order has no gaps. */
+export async function adminDeleteLab(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const id = req.params.id as string;
+    await prisma.$transaction(async (tx) => {
+      await tx.challenge.deleteMany({ where: { labId: id } });
+      await tx.lab.delete({ where: { id } });
+      const rest = await tx.lab.findMany({ orderBy: { orderIndex: 'asc' }, select: { id: true } });
+      for (let i = 0; i < rest.length; i++) {
+        await tx.lab.update({ where: { id: rest[i].id }, data: { orderIndex: i } });
+      }
+    });
+    res.status(204).send();
+  } catch (err) { next(err); }
+}

@@ -19,7 +19,7 @@ export async function adminGetLabs(req: AuthRequest, res: Response, next: NextFu
       include: {
         challenges: {
           orderBy: { orderIndex: 'asc' },
-          select: { id: true, slug: true, titleEn: true, titleAr: true, difficulty: true, points: true, orderIndex: true },
+          select: { id: true, slug: true, titleEn: true, titleAr: true, difficulty: true, points: true, orderIndex: true, isMaster: true },
         },
       },
     });
@@ -81,6 +81,7 @@ export async function adminCreateChallenge(req: AuthRequest, res: Response, next
         points: data.points,
         orderIndex,
         labId: data.labId,
+        isMaster: data.isMaster ?? false,
         schemaJson: data.schemaJson || null,
         referenceAnswer: data.referenceAnswer,
         starterCodes: { create: [{ language: 'SQL', code: '-- write your SQL query here\n' }] },
@@ -117,6 +118,7 @@ export async function adminUpdateChallenge(req: AuthRequest, res: Response, next
           descriptionAr: data.descriptionAr,
           difficulty: data.difficulty,
           points: data.points,
+          ...(data.isMaster !== undefined ? { isMaster: data.isMaster } : {}),
           schemaJson: data.schemaJson || null,
           referenceAnswer: data.referenceAnswer,
           hints: {
