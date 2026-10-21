@@ -8,7 +8,7 @@ import type { Stmt } from './sqlText';
 const FETCH_LIMIT = 1000;
 const DISPLAY_LIMIT = 100;
 const PANEL_ROWS = 50;
-const STATEMENT_TIMEOUT_MS = 8000;
+const STATEMENT_TIMEOUT_MS = 20000;
 const BASE_SCHEMA = 'playground';
 const REFERENCE_FAILED = 'The reference solution for this challenge failed to run. Please report it.';
 
