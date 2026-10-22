@@ -9,7 +9,7 @@ export interface SystemHealth { database: HealthCheck; redis: HealthCheck; sqlGr
 export interface AdminChallengeSummary { id: string; slug: string; titleEn: string; titleAr: string; difficulty: string; points: number; orderIndex: number; isMaster: boolean; }
 export interface AdminLab { id: string; slug: string; titleEn: string; titleAr: string; orderIndex: number; challenges: AdminChallengeSummary[]; }
 export interface AdminHint { id?: string; order: number; contentEn: string; contentAr: string; pointPenalty: number; }
-export interface AdminChallengeDetail { id: string; slug: string; titleEn: string; titleAr: string; descriptionEn: string; descriptionAr: string; difficulty: string; points: number; labId: string | null; schemaJson: string | null; referenceAnswer: string | null; isMaster: boolean; hints: AdminHint[]; }
+export interface AdminChallengeDetail { id: string; slug: string; titleEn: string; titleAr: string; descriptionEn: string; descriptionAr: string; difficulty: string; points: number; labId: string | null; schemaJson: string | null; referenceAnswer: string | null; setupSql: string | null; isMaster: boolean; hints: AdminHint[]; }
 export interface SqlTestResult { ok: boolean; columns: string[]; rows: unknown[][]; message: string; runtimeMs: number; }
 export interface AdminUser { id: string; username: string; totalPoints: number; role: 'STUDENT' | 'ADMIN'; isBanned: boolean; createdAt: string; solvedCount: number; avatarUrl?: string | null; }
 export interface AdminReport { id: string; reason: string; createdAt: string; username: string; challengeTitle: string; challengeSlug: string; }

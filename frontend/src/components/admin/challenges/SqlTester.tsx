@@ -11,9 +11,11 @@ interface Props {
   value: string;
   onChange: (v: string) => void;
   label?: string;
+  /** The challenge's hidden setup script. It runs first, exactly as it does for students. */
+  setupSql?: string | null;
 }
 
-export default function SqlTester({ value, onChange, label = 'Expected Query (SQL)' }: Props) {
+export default function SqlTester({ value, onChange, label = 'Expected Query (SQL)', setupSql }: Props) {
   const [result, setResult] = useState<SqlTestResult | null>(null);
   const [testing, setTesting] = useState(false);
 
@@ -21,7 +23,7 @@ export default function SqlTester({ value, onChange, label = 'Expected Query (SQ
     setTesting(true);
     setResult(null);
     try {
-      const { data } = await api.post<SqlTestResult>('/admin/sql-test', { sql: value });
+      const { data } = await api.post<SqlTestResult>('/admin/sql-test', { sql: value, setupSql: setupSql ?? null }, { timeout: 60000 });
       setResult(data);
     } catch (err: any) {
       setResult({ ok: false, columns: [], rows: [], message: err?.response?.data?.error || 'Test failed.', runtimeMs: 0 });

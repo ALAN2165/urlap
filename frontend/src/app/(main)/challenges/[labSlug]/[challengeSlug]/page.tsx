@@ -22,8 +22,8 @@ import ReportChallengeModal from '@/components/challenge/ReportChallengeModal';
 import { AuraFrame, EmberField } from '@/components/challenge/BossAura';
 
 const POLL_INTERVAL_MS = 600;
-const MAX_POLL_ATTEMPTS = 50;
-const REQUEST_TIMEOUT_MS = 10000;
+const MAX_POLL_ATTEMPTS = 100;
+const REQUEST_TIMEOUT_MS = 60000; // SQL is graded inside the submit request itself, so give it room
 const PASTE_FLAG_MIN_LENGTH = 20;
 const DRAFT_SAVE_DELAY_MS = 400;
 

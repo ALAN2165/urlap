@@ -4,13 +4,14 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { X, Save, Trash2, Loader2, Crown } from 'lucide-react';
+import { X, Save, Trash2, Loader2, Crown, ChevronDown, Wrench } from 'lucide-react';
 import { api } from '@/lib/api';
 import { AdminChallengeDetail, AdminHint } from '@/types/admin';
 import SchemaBuilder from './SchemaBuilder';
 import HintsEditor from './HintsEditor';
 import SqlTester from './SqlTester';
 import Switch from '@/components/shared/Switch';
+import CodeEditor from '@/components/editor/CodeEditor';
 
 interface Props { labId: string; challengeId: string | null; onClose: () => void; }
 
@@ -44,6 +45,8 @@ export default function ChallengeEditorPanel({ labId, challengeId, onClose }: Pr
   const [isMaster, setIsMaster] = useState(false);
   const [schemaJson, setSchemaJson] = useState<string | null>(null);
   const [referenceAnswer, setReferenceAnswer] = useState('-- write the correct SQL for this challenge\n');
+  const [setupSql, setSetupSql] = useState('');
+  const [showSetup, setShowSetup] = useState(false);
   const [hints, setHints] = useState<AdminHint[]>(EMPTY_HINTS);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -59,9 +62,13 @@ export default function ChallengeEditorPanel({ labId, challengeId, onClose }: Pr
       setIsMaster(!!existing.isMaster);
       setSchemaJson(existing.schemaJson);
       setReferenceAnswer(existing.referenceAnswer ?? '');
+      setSetupSql(existing.setupSql ?? '');
+      setShowSetup(!!existing.setupSql);
       setHints(existing.hints.length === 3 ? existing.hints : EMPTY_HINTS);
     }
   }, [existing]);
+
+  const activeSetup = setupSql.trim() ? setupSql : null;
 
   async function handleSave() {
     if (!titleEn.trim() || !titleAr.trim() || !referenceAnswer.trim()) {
@@ -72,6 +79,7 @@ export default function ChallengeEditorPanel({ labId, challengeId, onClose }: Pr
     try {
       const payload = {
         titleEn, titleAr, descriptionEn, descriptionAr, difficulty, points, isMaster, schemaJson, referenceAnswer,
+        setupSql: activeSetup,
         hints: hints.map((h) => ({ contentEn: h.contentEn, contentAr: h.contentAr, pointPenalty: h.pointPenalty })),
       };
       if (isEdit) await api.put(`/admin/challenges/${challengeId}`, payload);
@@ -79,6 +87,7 @@ export default function ChallengeEditorPanel({ labId, challengeId, onClose }: Pr
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['admin-labs'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-challenge', challengeId] }),
         queryClient.invalidateQueries({ queryKey: ['lab'] }),
         queryClient.invalidateQueries({ queryKey: ['labs'] }),
       ]);
@@ -182,11 +191,33 @@ export default function ChallengeEditorPanel({ labId, challengeId, onClose }: Pr
             </div>
 
             <div>
-              <SqlTester value={referenceAnswer} onChange={setReferenceAnswer} label="Expected Query (SQL)" />
+              <SqlTester value={referenceAnswer} onChange={setReferenceAnswer} label="Expected Query (SQL)" setupSql={activeSetup} />
               <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
                 Any valid SQL works: SELECT, INSERT, UPDATE, DELETE, or Oracle-style DDL. A SELECT is graded by the rows it returns, anything else by the
                 resulting tables and data. Nothing is ever saved to the real tables.
               </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-700/50">
+              <button type="button" onClick={() => setShowSetup((v) => !v)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left">
+                <span className="flex items-start gap-3">
+                  <Wrench size={16} className="mt-0.5 flex-shrink-0 text-slate-400" />
+                  <span>
+                    <span className="block text-sm font-bold text-slate-900 dark:text-white">
+                      Advanced: Setup SQL (hidden){activeSetup ? <span className="ml-2 rounded-full bg-purple-500/15 px-2 py-0.5 text-[10px] font-bold text-purple-600 dark:text-purple-300">in use</span> : null}
+                    </span>
+                    <span className="block text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                      Optional. Creates the tables or constraints this challenge assumes (for example a ready-made dept80 table). It runs first, before the expected query and before every student's query. Students never see it.
+                    </span>
+                  </span>
+                </span>
+                <ChevronDown size={16} className={`flex-shrink-0 text-slate-400 transition-transform ${showSetup ? 'rotate-180' : ''}`} />
+              </button>
+              {showSetup && (
+                <div className="border-t border-slate-200 p-4 dark:border-slate-700/50">
+                  <CodeEditor value={setupSql} onChange={setSetupSql} language="SQL" />
+                </div>
+              )}
             </div>
 
             <div>

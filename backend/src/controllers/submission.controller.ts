@@ -2,8 +2,8 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { submissionSchema } from '../validators/submission.validator';
 import { prisma } from '../config/db';
-import { enqueueExecution } from '../queues/executionQueue';
 import { isChallengeLocked } from '../services/labProgress.service';
+import { gradeSubmissionById } from '../services/submissionGrading.service';
 
 export async function createSubmission(req: AuthRequest, res: Response, next: NextFunction) {
   try {
@@ -19,6 +19,14 @@ export async function createSubmission(req: AuthRequest, res: Response, next: Ne
       },
     });
 
+    if (language === 'SQL') {
+      // Graded right here by the transactional sandbox engine: no Redis, no queue, no worker, no Docker.
+      await gradeSubmissionById(submission.id);
+      const done = await prisma.submission.findUniqueOrThrow({ where: { id: submission.id }, select: { status: true } });
+      return res.status(200).json({ submissionId: submission.id, status: done.status });
+    }
+
+    const { enqueueExecution } = await import('../queues/executionQueue');
     await enqueueExecution({ submissionId: submission.id, challengeId, userId: req.userId!, language, code });
     res.status(202).json({ submissionId: submission.id, status: 'PENDING' });
   } catch (err) { next(err); }
@@ -45,7 +53,6 @@ export async function getSubmission(req: AuthRequest, res: Response, next: NextF
       totalRows: parsed.totalRows ?? 0,
       expectedRowCount: parsed.expectedRowCount ?? null,
       failureReason: parsed.failureReason ?? null,
-      // Expected-vs-actual tables are only sent for wrong answers (never the reference SQL itself).
       comparison: submission.status === 'WRONG_ANSWER' ? parsed.panels ?? [] : [],
     });
   } catch (err) { next(err); }

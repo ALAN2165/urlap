@@ -84,6 +84,7 @@ export async function adminCreateChallenge(req: AuthRequest, res: Response, next
         isMaster: data.isMaster ?? false,
         schemaJson: data.schemaJson || null,
         referenceAnswer: data.referenceAnswer,
+        setupSql: data.setupSql && data.setupSql.trim() ? data.setupSql : null,
         starterCodes: { create: [{ language: 'SQL', code: '-- write your SQL query here\n' }] },
         hints: {
           create: data.hints.map((h, i) => ({
@@ -119,6 +120,7 @@ export async function adminUpdateChallenge(req: AuthRequest, res: Response, next
           difficulty: data.difficulty,
           points: data.points,
           ...(data.isMaster !== undefined ? { isMaster: data.isMaster } : {}),
+          ...(data.setupSql !== undefined ? { setupSql: data.setupSql && data.setupSql.trim() ? data.setupSql : null } : {}),
           schemaJson: data.schemaJson || null,
           referenceAnswer: data.referenceAnswer,
           hints: {

@@ -1,81 +1,14 @@
 import { Worker, Job } from 'bullmq';
 import { redisConnection } from '../config/redis';
-import { runInSandbox } from '../services/sandbox/dockerRunner';
-import { gradeSqlSubmission } from '../services/sqlGrader.service';
-import { prisma } from '../config/db';
 import { ExecutionJobData } from './executionQueue';
-import { checkForStruggleAlert } from '../services/alertDetection.service';
+import { gradeSubmissionById } from '../services/submissionGrading.service';
 
-async function recordCompletion(userId: string, challengeId: string, points: number): Promise<number> {
-  return prisma.$transaction(async (tx) => {
-    const { count } = await tx.challengeCompletion.createMany({ data: [{ userId, challengeId, pointsEarned: points }], skipDuplicates: true });
-    if (count === 0) return 0;
-    await tx.user.update({ where: { id: userId }, data: { totalPoints: { increment: points } } });
-    return points;
-  });
-}
-
+// Only non-SQL submissions reach this queue now; SQL is graded inline in the request.
 const worker = new Worker<ExecutionJobData>(
   'code-execution',
   async (job: Job<ExecutionJobData>) => {
-    const { submissionId, challengeId, userId, language, code } = job.data;
-    console.log(`[worker] Job received — job ${job.id}, submission ${submissionId}`);
-
-    try {
-      const challenge = await prisma.challenge.findUniqueOrThrow({ where: { id: challengeId }, include: { testCases: true } });
-      await prisma.submission.update({ where: { id: submissionId }, data: { status: 'RUNNING' } });
-
-      let status: string;
-      let allPassed: boolean;
-      let output = '';
-      let errorMsg = '';
-      let runtimeMs = 0;
-      let resultJson: string | null = null;
-
-      if (language === 'SQL' && challenge.referenceAnswer) {
-        const result = await gradeSqlSubmission(challenge, code);
-        status = result.status;
-        allPassed = result.passed;
-        output = result.output;
-        errorMsg = result.errorMessage;
-        runtimeMs = result.runtimeMs;
-        resultJson = JSON.stringify({
-          columns: result.resultColumns, rows: result.resultRows, totalRows: result.totalRows,
-          expectedRowCount: result.expectedRowCount, failureReason: result.failureReason, panels: result.panels,
-        });
-      } else {
-        allPassed = true;
-        status = 'ACCEPTED';
-        for (const testCase of challenge.testCases) {
-          const result = await runInSandbox(language, code, testCase.input, challenge.timeLimitMs, challenge.memoryLimitMb);
-          runtimeMs += result.runtimeMs;
-          output = result.stdout;
-          errorMsg = result.stderr;
-          if (result.timedOut) { status = 'TIME_LIMIT_EXCEEDED'; allPassed = false; break; }
-          if (result.exitCode !== 0) { status = 'RUNTIME_ERROR'; allPassed = false; break; }
-          if (result.stdout.trim() !== testCase.expectedOutput.trim()) { status = 'WRONG_ANSWER'; allPassed = false; break; }
-        }
-      }
-
-      const pointsAwarded = allPassed ? await recordCompletion(userId, challengeId, challenge.points) : 0;
-
-      await prisma.submission.update({
-        where: { id: submissionId },
-        data: { status: status as any, actualOutput: output, errorMessage: errorMsg || null, resultJson, runtimeMs, pointsAwarded },
-      });
-      console.log(`[worker] Submission ${submissionId} graded as ${status} — now checking struggle alert.`);
-
-      try {
-        await checkForStruggleAlert(userId, challengeId, status);
-      } catch (alertErr) {
-        console.error(`[worker] Struggle-alert check FAILED for submission ${submissionId}:`, alertErr);
-      }
-    } catch (err: any) {
-      console.error(`[worker] Execution job crashed for submission ${submissionId}:`, err);
-      await prisma.submission
-        .update({ where: { id: submissionId }, data: { status: 'RUNTIME_ERROR', errorMessage: err.message || 'Internal execution error.', pointsAwarded: 0 } })
-        .catch((updateErr) => console.error('[worker] Even the failure-update failed:', updateErr));
-    }
+    console.log(`[worker] Job received — job ${job.id}, submission ${job.data.submissionId}`);
+    await gradeSubmissionById(job.data.submissionId);
   },
   { connection: redisConnection, concurrency: 4 }
 );
