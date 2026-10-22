@@ -2,9 +2,10 @@
 
 import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
+import Image from 'next/image';
 import { useExtra } from '@/i18n/extra';
 
-/** A quiet "Crafted by" credit: a gradient initials avatar, and a soft glow that wakes up on hover. */
+/** A refined, glowing "Crafted by" credit badge with premium effects. */
 export default function CreatorBadge() {
   const x = useExtra();
 
@@ -17,19 +18,33 @@ export default function CreatorBadge() {
       title={x('creatorRole')}
       className="group relative mx-auto w-fit"
     >
+      {/* هالة وتوهج خلفي ديناميكي ينبض ويثير إعجاب العين عند الهوفر */}
       <span
         aria-hidden
-        className="pointer-events-none absolute -inset-1 rounded-full bg-gradient-to-r from-purple-500/0 via-fuchsia-500/40 to-amber-400/0 opacity-0 blur-lg transition-opacity duration-500 group-hover:opacity-100"
+        className="pointer-events-none absolute -inset-1.5 rounded-full bg-gradient-to-r from-purple-600/50 via-fuchsia-500/60 to-amber-400/50 opacity-30 blur-xl transition-all duration-700 group-hover:opacity-100 group-hover:blur-2xl group-hover:scale-105"
       />
-      <div className="relative flex items-center gap-3 rounded-full border border-slate-200 bg-white/80 py-2 pe-4 ps-2 backdrop-blur-md transition-colors duration-300 group-hover:border-purple-400/50 dark:border-white/10 dark:bg-slate-900/70">
-        <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 via-fuchsia-500 to-amber-400 text-[11px] font-black text-white shadow-[0_0_14px_rgba(168,85,247,0.45)]">
-          {x('creatorInitials')}
-        </span>
+      
+      {/* الحاوية الأساسية مع حدود متدرجة وتأثير زجاجي أنيق */}
+      <div className="relative flex items-center gap-3 rounded-full border border-purple-500/30 bg-slate-900/90 py-2 pe-4 ps-2 shadow-xl backdrop-blur-xl transition-all duration-300 group-hover:border-purple-400/80 group-hover:shadow-[0_0_20px_rgba(168,85,247,0.3)] dark:border-white/15 dark:bg-slate-900/85">
+        
+        {/* إطار الصورة مع حلقة متوهجة وخفيفة */}
+        <div className="relative h-9 w-9 flex-shrink-0 overflow-hidden rounded-full ring-2 ring-purple-500/50 shadow-[0_0_12px_rgba(168,85,247,0.5)] transition-transform duration-300 group-hover:scale-105">
+          <Image
+            src="/me.png"
+            alt={x('creatorName')}
+            fill
+            className="object-cover"
+          />
+        </div>
+
+        {/* النصوص بشكل منسق واحترافي */}
         <span className="flex flex-col leading-tight">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400 rtl:normal-case rtl:tracking-normal dark:text-slate-500">{x('craftedBy')}</span>
-          <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{x('creatorName')}</span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-purple-300/90 rtl:normal-case rtl:tracking-normal">{x('craftedBy')}</span>
+          <span className="text-sm font-bold text-white tracking-wide">{x('creatorName')}</span>
         </span>
-        <Sparkles size={14} className="text-purple-400 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-125" />
+
+        {/* أيقونة تفاعلية بحركة ناعمة */}
+        <Sparkles size={14} className="text-amber-400 transition-transform duration-500 group-hover:rotate-45 group-hover:scale-125" />
       </div>
     </motion.div>
   );
