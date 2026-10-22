@@ -21,7 +21,7 @@ export async function getLabs(req: AuthRequest, res: Response, next: NextFunctio
 
     res.json(labs.map((lab) => {
       const access = computeAccess(lab.challenges, solved);
-      const visible = lab.challenges.filter((c) => !(access.get(c.id)!).hidden); // a hidden Master Challenge isn't counted
+      const visible = lab.challenges.filter((c) => !(access.get(c.id)!).hidden);
       return {
         id: lab.id, slug: lab.slug, titleEn: lab.titleEn, titleAr: lab.titleAr, orderIndex: lab.orderIndex,
         totalChallenges: visible.length,
@@ -45,7 +45,6 @@ export async function getLab(req: AuthRequest, res: Response, next: NextFunction
     const solved = await solvedSet(req.userId!);
     const access = computeAccess(lab.challenges, solved);
 
-    // A Master Challenge that hasn't been earned yet is simply absent. Once earned it is in the list, flagged isBoss.
     const challenges = lab.challenges
       .filter((c) => !(access.get(c.id)!).hidden)
       .map(({ isMaster, ...c }) => ({ ...c, solved: solved.has(c.id), locked: access.get(c.id)!.locked, isBoss: access.get(c.id)!.isBoss }));
@@ -62,7 +61,7 @@ export async function getChallenge(req: AuthRequest, res: Response, next: NextFu
     });
 
     const access = await getChallengeAccess(challenge.id, req.userId);
-    if (access.hidden) return res.status(404).json({ error: 'Challenge not found.' }); // Master Challenge not earned yet
+    if (access.hidden) return res.status(404).json({ error: 'Challenge not found.' });
 
     if (access.locked) {
       return res.json({
@@ -125,11 +124,13 @@ export async function getChallengeSampleData(req: AuthRequest, res: Response, ne
     for (const table of schema.tables || []) {
       if (!SAFE_IDENTIFIER.test(table.name)) continue;
       const result = await testSqlQuery(`SELECT * FROM ${table.name} LIMIT 5`, challenge.setupSql);
+      // A table the student is supposed to CREATE doesn't exist yet: show its columns, not an error.
+      const notCreatedYet = !result.ok && /doesn't exist/i.test(result.message);
       results.push({
         name: table.name,
         columns: result.ok ? result.columns : table.columns.map((c) => c.name),
         rows: result.ok ? result.rows : [],
-        error: result.ok ? null : result.message,
+        error: result.ok || notCreatedYet ? null : result.message,
       });
     }
     res.json({ tables: results });

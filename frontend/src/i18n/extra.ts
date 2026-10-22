@@ -23,6 +23,10 @@ const en = {
   resetCode: 'Reset',
   resetConfirm: 'Discard your saved draft and restore the starter code?',
   draftRestored: 'Your saved draft was restored.',
+  craftedBy: 'Crafted by',
+  creatorName: 'Mohamed Yasser',
+  creatorRole: 'Creator & architect of urlap',
+  creatorInitials: 'MY',
 };
 
 const ar: Record<keyof typeof en, string> = {
@@ -46,6 +50,10 @@ const ar: Record<keyof typeof en, string> = {
   resetCode: 'إعادة تعيين',
   resetConfirm: 'هل تريد حذف المسودة المحفوظة واستعادة الكود الابتدائي؟',
   draftRestored: 'تمت استعادة مسودتك المحفوظة.',
+  craftedBy: 'صُنع بواسطة',
+  creatorName: 'محمد ياسر',
+  creatorRole: 'صاحب فكرة urlap ومهندسها',
+  creatorInitials: 'م ي',
 };
 
 export type ExtraKey = keyof typeof en;

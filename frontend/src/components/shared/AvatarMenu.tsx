@@ -30,13 +30,18 @@ export default function AvatarMenu() {
 
       <AnimatePresence>
         {open && (
-          <motion.div initial={{ opacity: 0, scale: 0.95, y: -8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -8 }} transition={{ duration: 0.15 }}
-            className="glass absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-2xl p-2 rtl:left-0 rtl:right-auto">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -8 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-2xl backdrop-blur-md dark:border-white/10 dark:bg-slate-900/95 rtl:left-0 rtl:right-auto"
+          >
             <div className="mb-1 px-3 py-2"><div className="truncate text-sm font-bold text-slate-900 dark:text-white">{user.username}</div></div>
-            <Link href="/dashboard" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/50">
+            <Link href="/dashboard" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/5">
               <LayoutDashboard size={15} /> {t('dashboard')}
             </Link>
-            <Link href="/profile" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/50">
+            <Link href="/profile" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/5">
               <UserRound size={15} /> {t('profile')}
             </Link>
             {user.role === 'ADMIN' && (
@@ -44,7 +49,7 @@ export default function AvatarMenu() {
                 <Shield size={15} /> Admin Dashboard
               </Link>
             )}
-            <div className="my-1 border-t border-slate-200 dark:border-slate-700/50" />
+            <div className="my-1 border-t border-slate-200 dark:border-white/10" />
             <button onClick={() => { setOpen(false); logout(); }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-start text-sm font-medium text-red-500 hover:bg-red-500/10">
               <LogOut size={15} /> {t('logout')}
             </button>
