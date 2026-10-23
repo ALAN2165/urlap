@@ -56,7 +56,9 @@ export default function Navbar() {
   return (
     <motion.nav initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.6, ease: 'easeOut' }} className="fixed top-0 z-50 w-full glass">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 md:h-20 lg:px-8">
-        <Link href="/" className="flex-shrink-0"><LogoOrb size={56} imgSize={34} float={false} /></Link>
+        <Link href="/" className="flex-shrink-0">
+          <LogoOrb size={64} imgSize={56} float={false} />
+        </Link>
 
         {user && (
           <div className="hidden items-center gap-1 lg:flex">

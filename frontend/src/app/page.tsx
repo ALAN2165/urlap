@@ -91,8 +91,7 @@ export default function HomePage() {
             transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
             className="relative flex h-full w-full items-center justify-center rounded-full border border-purple-300/40 bg-white/80 shadow-[0_0_60px_rgba(147,51,234,0.3)] backdrop-blur-2xl dark:border-purple-400/10 dark:bg-slate-800/50"
           >
-            <img src="/logo.png" alt="urlap" className="h-[90px] w-auto object-contain sm:h-[120px] md:h-[150px] lg:h-[170px]" />
-          </motion.div>
+<img src="/logo.png" alt="urlap" className="h-[95%] w-[95%] object-contain drop-shadow-[0_0_25px_rgba(168,85,247,0.4)]" />          </motion.div>
         </motion.div>
       </div>
 
