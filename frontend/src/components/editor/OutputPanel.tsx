@@ -60,6 +60,11 @@ export default function OutputPanel({ submission, running, nextHref }: Props) {
 
   const showComparison = status === 'WRONG_ANSWER' && (submission?.comparison?.length ?? 0) > 0;
 
+  // Net points actually earned on this first solve (older submissions without an `award` fall back to pointsAwarded).
+  const award = submission?.award ?? null;
+  const firstSolve = award ? award.firstSolve : (submission?.pointsAwarded ?? 0) > 0;
+  const netPoints = award ? award.net : submission?.pointsAwarded ?? 0;
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: 'easeOut' }}
       className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700/50 dark:bg-slate-900/60 dark:shadow-none">
@@ -89,10 +94,15 @@ export default function OutputPanel({ submission, running, nextHref }: Props) {
           <div className="space-y-3">
             {status === 'ACCEPTED' && (
               <div className="rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3">
-                {submission.pointsAwarded > 0 ? (
+                {firstSolve ? (
                   <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 15 }} className="flex flex-col gap-0.5">
                     <span className="flex items-center gap-2 text-sm font-bold text-green-700 dark:text-green-300"><Sparkles size={16} />{successMessage}</span>
-                    <span className="text-xs font-semibold text-green-600/80 dark:text-green-400/70">{t('pointsEarned', { points: submission.pointsAwarded })}</span>
+                    <span className="text-xs font-semibold text-green-600/80 dark:text-green-400/70">{t('pointsEarned', { points: netPoints })}</span>
+                    {award && award.penalty > 0 && (
+                      <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                        {x('awardBreakdown', { base: award.base, penalty: award.penalty, net: award.net })}
+                      </span>
+                    )}
                   </motion.div>
                 ) : (
                   <span className="text-sm font-medium text-green-800 dark:text-green-300">{t('alreadySolved')}</span>

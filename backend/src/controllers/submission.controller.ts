@@ -35,6 +35,7 @@ export async function createSubmission(req: AuthRequest, res: Response, next: Ne
 interface StoredResult {
   columns?: string[]; rows?: unknown[][]; totalRows?: number; expectedRowCount?: number | null;
   failureReason?: string | null; panels?: unknown[];
+  award?: { base: number; penalty: number; net: number; firstSolve: boolean } | null;
 }
 
 export async function getSubmission(req: AuthRequest, res: Response, next: NextFunction) {
@@ -54,6 +55,7 @@ export async function getSubmission(req: AuthRequest, res: Response, next: NextF
       expectedRowCount: parsed.expectedRowCount ?? null,
       failureReason: parsed.failureReason ?? null,
       comparison: submission.status === 'WRONG_ANSWER' ? parsed.panels ?? [] : [],
+      award: parsed.award ?? null,
     });
   } catch (err) { next(err); }
 }

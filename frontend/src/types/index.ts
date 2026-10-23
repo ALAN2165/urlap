@@ -11,6 +11,7 @@ export interface ChallengeDetail { id: string; slug: string; titleEn: string; ti
 
 export interface ComparisonSide { columns: string[]; rows: unknown[][]; total: number; }
 export interface ComparisonPanel { title: string; expected: ComparisonSide; actual: ComparisonSide; }
+export interface Award { base: number; penalty: number; net: number; firstSolve: boolean; }
 
 export interface Submission {
   id: string; status: string; actualOutput?: string | null; errorMessage?: string | null;
@@ -18,6 +19,7 @@ export interface Submission {
   resultColumns?: string[]; resultRows?: unknown[][]; totalRows?: number; expectedRowCount?: number | null;
   failureReason?: 'COLUMNS' | 'ROW_COUNT' | 'ROWS' | 'NOT_ROW_RETURNING' | 'STRUCTURE' | 'COMMIT' | null;
   comparison?: ComparisonPanel[];
+  award?: Award | null;
 }
 
 export interface Stats { totalPoints: number; rank: number; totalUsers: number; solvedChallenges: number; totalChallenges: number; totalSubmissions: number; successRate: number; }

@@ -2,13 +2,31 @@ import { prisma } from '../config/db';
 import { gradeSqlSubmission } from './sqlGrader.service';
 import { checkForStruggleAlert } from './alertDetection.service';
 
-async function recordCompletion(userId: string, challengeId: string, points: number): Promise<number> {
-  return prisma.$transaction(async (tx) => {
-    const { count } = await tx.challengeCompletion.createMany({ data: [{ userId, challengeId, pointsEarned: points }], skipDuplicates: true });
-    if (count === 0) return 0;
-    await tx.user.update({ where: { id: userId }, data: { totalPoints: { increment: points } } });
-    return points;
+interface Award { base: number; penalty: number; net: number; firstSolve: boolean }
+
+/** Sum of the point penalties of every hint this student has unlocked on this challenge (persisted in HintUsage). */
+async function hintPenaltyFor(userId: string, challengeId: string): Promise<number> {
+  const usages = await prisma.hintUsage.findMany({
+    where: { userId, hint: { challengeId } },
+    select: { hint: { select: { pointPenalty: true } } },
   });
+  return usages.reduce((sum, u) => sum + u.hint.pointPenalty, 0);
+}
+
+/** Records the first solve and adds the NET points (base minus hint penalties, never below 0) to the student's total.
+ *  A second solve of the same challenge awards nothing: the unique (user, challenge) record prevents point farming. */
+async function recordCompletion(userId: string, challengeId: string, base: number): Promise<Award> {
+  const penalty = await hintPenaltyFor(userId, challengeId);
+  const net = Math.max(0, base - penalty);
+
+  const firstSolve = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.challengeCompletion.createMany({ data: [{ userId, challengeId, pointsEarned: net }], skipDuplicates: true });
+    if (count === 0) return false;
+    if (net > 0) await tx.user.update({ where: { id: userId }, data: { totalPoints: { increment: net } } });
+    return true;
+  });
+
+  return { base, penalty, net, firstSolve };
 }
 
 /**
@@ -29,7 +47,7 @@ export async function gradeSubmissionById(submissionId: string): Promise<void> {
     let output = '';
     let errorMsg = '';
     let runtimeMs = 0;
-    let resultJson: string | null = null;
+    let resultObj: Record<string, unknown> = {};
 
     if (sub.language === 'SQL') {
       const result = await gradeSqlSubmission(challenge, sub.code);
@@ -38,10 +56,10 @@ export async function gradeSubmissionById(submissionId: string): Promise<void> {
       output = result.output;
       errorMsg = result.errorMessage;
       runtimeMs = result.runtimeMs;
-      resultJson = JSON.stringify({
+      resultObj = {
         columns: result.resultColumns, rows: result.resultRows, totalRows: result.totalRows,
         expectedRowCount: result.expectedRowCount, failureReason: result.failureReason, panels: result.panels,
-      });
+      };
     } else {
       const { runInSandbox } = await import('./sandbox/dockerRunner');
       allPassed = true;
@@ -57,11 +75,19 @@ export async function gradeSubmissionById(submissionId: string): Promise<void> {
       }
     }
 
-    const pointsAwarded = allPassed ? await recordCompletion(sub.userId, sub.challengeId, challenge.points) : 0;
+    const award = allPassed ? await recordCompletion(sub.userId, sub.challengeId, challenge.points) : null;
+    const pointsAwarded = award && award.firstSolve ? award.net : 0;
 
     await prisma.submission.update({
       where: { id: submissionId },
-      data: { status: status as any, actualOutput: output, errorMessage: errorMsg || null, resultJson, runtimeMs, pointsAwarded },
+      data: {
+        status: status as any,
+        actualOutput: output,
+        errorMessage: errorMsg || null,
+        resultJson: JSON.stringify({ ...resultObj, award }),
+        runtimeMs,
+        pointsAwarded,
+      },
     });
 
     try {

@@ -7,7 +7,13 @@ import { useLocale, useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
 import { HintMeta, HintRevealed } from '@/types';
 
-export default function HintPanel({ hints }: { hints: HintMeta[] }) {
+interface Props {
+  hints: HintMeta[];
+  /** Called with the total point penalty of every hint the student has opened on this challenge. */
+  onPenaltyChange?: (total: number) => void;
+}
+
+export default function HintPanel({ hints, onPenaltyChange }: Props) {
   const locale = useLocale();
   const t = useTranslations('challenge');
   const [revealed, setRevealed] = useState<Record<string, HintRevealed>>({});
@@ -27,6 +33,12 @@ export default function HintPanel({ hints }: { hints: HintMeta[] }) {
       return next;
     });
   }, [hints]);
+
+  useEffect(() => {
+    const total = Object.values(revealed).reduce((sum, h) => sum + h.pointPenalty, 0);
+    onPenaltyChange?.(total);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealed]);
 
   async function reveal(hintId: string) {
     setLoadingId(hintId);

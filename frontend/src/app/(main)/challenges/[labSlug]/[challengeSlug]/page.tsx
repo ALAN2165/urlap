@@ -53,6 +53,7 @@ export default function ChallengeSolvePage() {
   const [reportOpen, setReportOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
+  const [hintPenalty, setHintPenalty] = useState(0);
 
   const cancelRef = useRef({ cancelled: false });
   const currentIdRef = useRef<string | undefined>(undefined);
@@ -208,7 +209,20 @@ export default function ChallengeSolvePage() {
     : challenge.difficulty === 'HARD' ? t('difficultyHard')
     : t('difficultyExpert');
 
-  const conquered = isMaster && submission?.status === 'ACCEPTED' && submission.pointsAwarded > 0;
+  // The hint penalty only matters until the challenge is solved (a solved challenge awards nothing more).
+  const alreadySolved = idx >= 0 ? ordered[idx].solved : false;
+  const netPoints = Math.max(0, challenge.points - hintPenalty);
+  const showPenalty = hintPenalty > 0 && !alreadySolved;
+
+  const firstSolveNow = submission?.status === 'ACCEPTED' && (submission.award ? submission.award.firstSolve : submission.pointsAwarded > 0);
+  const conquered = isMaster && !!firstSolveNow;
+
+  const pointsLine = (
+    <>
+      <span>{challenge.points} {t('pts')}</span>
+      {showPenalty && <span className="ms-2 text-xs font-semibold text-amber-500 dark:text-amber-300">{x('hintPenaltyNote', { penalty: hintPenalty, net: netPoints })}</span>}
+    </>
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 md:py-10">
@@ -232,9 +246,9 @@ export default function ChallengeSolvePage() {
                     <Crown size={12} /> {x('bossLabel')}
                   </span>
                   <h1 className="mb-3 bg-gradient-to-r from-amber-100 via-rose-200 to-violet-200 bg-clip-text text-2xl font-black text-transparent sm:text-3xl">{title}</h1>
-                  <div className="mb-5 flex items-center gap-3">
+                  <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1">
                     <span className="flex items-center gap-1 rounded-full bg-rose-300/10 px-3 py-1 text-xs font-bold text-rose-200"><Sparkles size={12} />{difficultyLabel}</span>
-                    <span className="text-sm font-bold text-amber-200">{challenge.points} {t('pts')}</span>
+                    <span className="text-sm font-bold text-amber-200">{pointsLine}</span>
                   </div>
                   <p className="whitespace-pre-line leading-relaxed text-slate-200">{description}</p>
                 </div>
@@ -243,9 +257,9 @@ export default function ChallengeSolvePage() {
           ) : (
             <div className="glass mb-6 rounded-3xl p-5 sm:p-7">
               <h1 className="mb-3 text-xl font-extrabold text-slate-900 dark:text-white sm:text-2xl">{title}</h1>
-              <div className="mb-5 flex items-center gap-3">
+              <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span className="rounded-full bg-purple-500/10 px-3 py-1 text-xs font-bold text-purple-700 dark:text-purple-400">{difficultyLabel}</span>
-                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">{challenge.points} {t('pts')}</span>
+                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">{pointsLine}</span>
               </div>
               <p className="whitespace-pre-line leading-relaxed text-slate-700 dark:text-slate-300">{description}</p>
             </div>
@@ -253,7 +267,7 @@ export default function ChallengeSolvePage() {
 
           <SchemaViewer schemaJson={challenge.schemaJson} />
           <LiveSampleDataViewer challengeSlug={challengeSlug} />
-          <HintPanel hints={challenge.hints} />
+          <HintPanel key={challenge.id} hints={challenge.hints} onPenaltyChange={setHintPenalty} />
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.15 }}>

@@ -23,10 +23,14 @@ const en = {
   resetCode: 'Reset',
   resetConfirm: 'Discard your saved draft and restore the starter code?',
   draftRestored: 'Your saved draft was restored.',
+  hintPenaltyNote: '(−{penalty} hint penalty = {net} pts)',
+  awardBreakdown: '{base} base − {penalty} hint penalty = {net} pts',
   craftedBy: 'Crafted by',
   creatorName: 'Mohamed Yasser',
   creatorRole: 'Creator & architect of urlap',
   creatorInitials: 'MY',
+  architectTag: 'Platform Architect',
+  devId: 'Dev ID',
 };
 
 const ar: Record<keyof typeof en, string> = {
@@ -50,10 +54,14 @@ const ar: Record<keyof typeof en, string> = {
   resetCode: 'إعادة تعيين',
   resetConfirm: 'هل تريد حذف المسودة المحفوظة واستعادة الكود الابتدائي؟',
   draftRestored: 'تمت استعادة مسودتك المحفوظة.',
+  hintPenaltyNote: '(−{penalty} خصم التلميحات = {net} نقطة)',
+  awardBreakdown: '{base} أساسية − {penalty} خصم التلميحات = {net} نقطة',
   craftedBy: 'صُنع بواسطة',
   creatorName: 'محمد ياسر',
   creatorRole: 'صاحب فكرة urlap ومهندسها',
   creatorInitials: 'م ي',
+  architectTag: 'مهندس المنصة',
+  devId: 'هوية المطوّر',
 };
 
 export type ExtraKey = keyof typeof en;
