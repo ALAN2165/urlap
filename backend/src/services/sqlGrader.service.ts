@@ -1,8 +1,9 @@
+
 import crypto from 'crypto';
 import type { PoolClient } from 'pg';
 import { graderPool } from '../config/sqlGraderPool';
 import { friendlyPgError } from '../utils/friendlyError';
-import { normalizeSql, parseRollbackTo, parseSavepoint, TXN_BASE } from './sqlText';
+import { normalizeSql, parseRollbackTo, parseSavepoint, PLSQL_VARS_TABLE, TXN_BASE } from './sqlText';
 import type { Stmt } from './sqlText';
 
 const FETCH_LIMIT = 1000;
@@ -270,6 +271,11 @@ async function runSandboxed(client: PoolClient, stmts: Stmt[], fixture: Stmt[], 
     await client.query(`SET LOCAL statement_timeout = '${STATEMENT_TIMEOUT_MS}ms'`);
     await client.query(`CREATE SCHEMA ${schema}`);
     await client.query(`SET LOCAL search_path = ${schema}, ${BASE_SCHEMA}`);
+
+    // Diagnostic table a transpiled PL/SQL block writes its declared variables' final values into
+    // (as jsonb), so challenges graded purely on local variable state — never touching a real table —
+    // still produce something the snapshot/diff below can compare. Harmless no-op for every other lab.
+    await client.query(`CREATE TABLE ${schema}.${quoteIdent(PLSQL_VARS_TABLE)} (k text PRIMARY KEY, v jsonb)`);
 
     const tables = await client.query(`SELECT tablename FROM pg_tables WHERE schemaname = '${BASE_SCHEMA}' ORDER BY tablename`);
     for (const t of tables.rows) {

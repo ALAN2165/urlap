@@ -1,5 +1,10 @@
-export type StmtKind = 'query' | 'dml' | 'ddl' | 'commit' | 'rollback' | 'rollbackTo' | 'savepoint' | 'blocked';
+
+export type StmtKind = 'query' | 'dml' | 'ddl' | 'commit' | 'rollback' | 'rollbackTo' | 'savepoint' | 'blocked' | 'plsql';
 export interface Stmt { sql: string; kind: StmtKind; word: string }
+
+/** Name of the diagnostic table every sandbox gets, used to grade PL/SQL blocks whose
+ *  correctness lives in local variables rather than in any real table (see transpilePlsqlBlock). */
+export const PLSQL_VARS_TABLE = 'urlap_plsql_vars';
 
 /** Internal savepoint that marks "the last COMMIT" inside the sandbox transaction. */
 export const TXN_BASE = 'urlap_base';
@@ -48,17 +53,55 @@ function replaceMasked(sql: string, re: RegExp, repl: string | ((m: RegExpExecAr
   return out + sql.slice(last);
 }
 
+/** Matches a top-level ';', or a BEGIN/END keyword that opens or closes a PL/SQL block.
+ *  END IF / END LOOP / END CASE close an inner construct, not the BEGIN block itself, so they're excluded. */
+const BLOCK_TOKEN_RE = /;|\bBEGIN\b|\bEND\b(?!\s+(?:IF|LOOP|CASE)\b)/gi;
+
+/** Splits sql into top-level statements. A '; that falls inside a BEGIN...END (anonymous PL/SQL
+ *  block) is NOT a split point — only the ';' that immediately follows the block's closing END is. */
 export function splitStatements(sql: string): string[] {
   const masked = maskSql(sql);
   const parts: string[] = [];
   let start = 0;
-  for (let i = 0; i <= masked.length; i++) {
-    if (i === masked.length || masked[i] === ';') {
-      if (masked.slice(start, i).trim()) parts.push(sql.slice(start, i).trim());
-      start = i + 1;
+  let depth = 0;
+  const re = new RegExp(BLOCK_TOKEN_RE.source, 'gi');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(masked)) !== null) {
+    const tok = m[0];
+    if (tok === ';') {
+      if (depth === 0) {
+        if (masked.slice(start, m.index).trim()) parts.push(sql.slice(start, m.index).trim());
+        start = m.index + 1;
+      }
+      continue;
+    }
+    if (/^begin$/i.test(tok)) depth += 1;
+    else depth = Math.max(0, depth - 1); // a closing END (not IF/LOOP/CASE)
+  }
+  if (masked.slice(start).trim()) parts.push(sql.slice(start).trim());
+  return parts;
+}
+
+/** Finds the first top-level BEGIN in a masked statement and the position of its matching END.
+ *  Returns null if unbalanced (no matching END found) — caller should treat that as malformed. */
+function findBlockBeginEnd(masked: string): { beginStart: number; beginEnd: number; endStart: number } | null {
+  const re = new RegExp(BLOCK_TOKEN_RE.source, 'gi');
+  let depth = 0;
+  let beginStart = -1;
+  let beginEnd = -1;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(masked)) !== null) {
+    const tok = m[0];
+    if (tok === ';') continue;
+    if (/^begin$/i.test(tok)) {
+      if (depth === 0 && beginStart === -1) { beginStart = m.index; beginEnd = m.index + tok.length; }
+      depth += 1;
+    } else {
+      depth = Math.max(0, depth - 1);
+      if (depth === 0 && beginStart !== -1) return { beginStart, beginEnd, endStart: m.index };
     }
   }
-  return parts;
+  return null;
 }
 
 export function firstWord(sql: string): string {
@@ -76,6 +119,10 @@ export function classify(sql: string): StmtKind {
   if (word === 'commit') return 'commit';
   if (word === 'rollback') return /^rollback\b(?:\s+work)?\s+to\b/i.test(masked) ? 'rollbackTo' : 'rollback';
   if (word === 'savepoint') return 'savepoint';
+  // An anonymous PL/SQL block always starts with DECLARE here (splitStatements only hands us a
+  // complete, balanced DECLARE...BEGIN...END chunk). Bare BEGIN...END (no DECLARE) stays blocked,
+  // since that's ambiguous with Postgres's own `BEGIN;` transaction starter.
+  if (word === 'declare') return 'plsql';
   if (BLOCKED.indexOf(word) !== -1) return 'blocked';
   if (DDL.indexOf(word) !== -1) return 'ddl';
   return 'dml';
@@ -346,15 +393,100 @@ function rewriteSequenceRefs(sql: string): string {
   return replaceMasked(sql, /\b([A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)?)\.(nextval|currval)\b/gi, (m) => `${m[2].toLowerCase()}('${m[1]}')`);
 }
 
+// ---------------------------------------------------------------------------
+// Anonymous PL/SQL blocks (DECLARE ... BEGIN ... END;) -> PostgreSQL DO block
+// ---------------------------------------------------------------------------
+
+const TCL_WORDS = ['commit', 'rollback', 'savepoint'];
+/** Declare-section items that aren't a plain "name [CONSTANT] type [NOT NULL] [:= expr];"
+ *  variable/constant — we don't try to capture these for diagnostics. */
+const NON_VAR_DECLARE = /^\s*(cursor|type|exception|pragma|subtype|function|procedure)\b/i;
+
+/** Oracle "INSERT INTO t VALUES record_var;" -> PostgreSQL "INSERT INTO t VALUES (record_var.*);".
+ *  Only touches a bare identifier directly after VALUES (a real column-value list already has its
+ *  own parens and is left untouched). */
+function fixRecordInsert(stmt: string): string {
+  if (firstWord(stmt) !== 'insert') return stmt;
+  return stmt.replace(/\bVALUES\s+([A-Za-z_][\w$]*)\s*$/i, 'VALUES ($1.*)');
+}
+
+/** Extracts the simple variable/constant names declared directly in a DECLARE section
+ *  (skips CURSOR/TYPE/EXCEPTION/nested-subprogram declarations). */
+function declaredVarNames(declareSection: string): string[] {
+  const names: string[] = [];
+  for (const item of splitStatements(declareSection)) {
+    if (NON_VAR_DECLARE.test(item)) continue;
+    const m = /^\s*([A-Za-z_]\w*)\b/.exec(item);
+    if (m) names.push(m[1]);
+  }
+  return names;
+}
+
+/**
+ * Transpiles one balanced "[DECLARE ...] BEGIN ... END" statement (as produced by splitStatements)
+ * into PostgreSQL. Most of Oracle PL/SQL syntax (%TYPE, %ROWTYPE, CONSTANT, NOT NULL, SELECT INTO)
+ * is already valid PL/pgSQL once wrapped in a DO block, so this only has to:
+ *  - map Oracle scalar types (NUMBER, VARCHAR2, ...) in the DECLARE section,
+ *  - fix the "INSERT ... VALUES record_var" shorthand,
+ *  - pull any trailing COMMIT/ROLLBACK/SAVEPOINT out (Postgres DO blocks can't run those) into their
+ *    own top-level statements, reusing the existing savepoint-based commit emulation, and
+ *  - append a diagnostic INSERT capturing every declared variable's final value as jsonb, so
+ *    challenges whose correctness lives only in local variables (never touching a real table) are
+ *    still gradable by the existing snapshot/diff machinery.
+ * Returns one or more Stmt entries (the DO block, plus zero or more trailing TCL statements).
+ * Falls back to 'blocked' if the block isn't actually balanced (defensive; splitStatements should
+ * never hand us one of those).
+ */
+function transpilePlsqlBlock(stmtSql: string): Stmt[] {
+  const masked = maskSql(stmtSql);
+  const loc = findBlockBeginEnd(masked);
+  if (!loc) return [{ sql: stmtSql, kind: 'blocked', word: firstWord(stmtSql) }];
+
+  const declareKw = /\bDECLARE\b/i.exec(masked.slice(0, loc.beginStart));
+  const declareSection = declareKw ? stmtSql.slice(declareKw.index + declareKw[0].length, loc.beginStart) : '';
+  const bodyRaw = stmtSql.slice(loc.beginEnd, loc.endStart);
+
+  const bodyStmts = splitStatements(bodyRaw);
+
+  // Peel off a trailing run of COMMIT / ROLLBACK [TO x] / SAVEPOINT x statements.
+  let cut = bodyStmts.length;
+  while (cut > 0 && TCL_WORDS.indexOf(firstWord(bodyStmts[cut - 1])) !== -1) cut -= 1;
+  const kept = bodyStmts.slice(0, cut);
+  const tclRaw = bodyStmts.slice(cut);
+
+  const fixedKept = kept.map(fixRecordInsert);
+
+  const names = declaredVarNames(declareSection);
+  const diag = names.length
+    ? `INSERT INTO ${PLSQL_VARS_TABLE}(k, v) VALUES ${names
+        .map((nm) => `('${nm}', to_jsonb(${nm}))`)
+        .join(', ')} ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v;`
+    : '';
+
+  // A DO block body can't be empty (e.g. a block that is only COMMIT;) — NULL; is a safe no-op filler.
+  const bodyText = [...fixedKept.map((s) => `${s};`), diag].filter(Boolean).join('\n') || 'NULL;';
+  const doSql = `DO $urlap_plsql$\nDECLARE${mapOracleTypes(declareSection)}\nBEGIN\n${bodyText}\nEND;\n$urlap_plsql$ LANGUAGE plpgsql;`;
+
+  const out: Stmt[] = [{ sql: doSql, kind: 'plsql', word: 'declare' }];
+  for (const t of tclRaw) out.push({ sql: t, kind: classify(t), word: firstWord(t) });
+  return out;
+}
+
 /** Splits a script into statements, classifies each, and translates Oracle syntax to PostgreSQL. */
 export function normalizeSql(sql: string): Stmt[] {
   const withDates = replaceMasked(sql, /\bSYSDATE\b(?!\s*\()/gi, 'CURRENT_DATE');
-  return splitStatements(withDates).map((original) => {
+  const out: Stmt[] = [];
+  for (const original of splitStatements(withDates)) {
     const kind = classify(original);
-    let out = original;
-    if (kind === 'query') out = rewriteOracleOuterJoins(out);
-    if (kind === 'ddl') out = rewriteOracleDdl(out);
-    out = rewriteSequenceRefs(out);
-    return { sql: out, kind, word: firstWord(original) };
-  });
+    if (kind === 'plsql') {
+      out.push(...transpilePlsqlBlock(original));
+      continue;
+    }
+    let sqlOut = original;
+    if (kind === 'query') sqlOut = rewriteOracleOuterJoins(sqlOut);
+    if (kind === 'ddl') sqlOut = rewriteOracleDdl(sqlOut);
+    sqlOut = rewriteSequenceRefs(sqlOut);
+    out.push({ sql: sqlOut, kind, word: firstWord(original) });
+  }
+  return out;
 }
